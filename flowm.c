@@ -2,10 +2,22 @@
 #include <stdlib.h>
 #include <X11/Xlib.h>
 
+static void loop_events(void);
 static void open_display_connection(void);
 static void close_display_connection(void);
 
 static Display *display;
+
+void loop_events(void)
+{
+	XEvent event;
+
+	while (1) {
+		XNextEvent(display, &event);
+
+		/* Handle events */
+	}
+}
 
 void open_display_connection(void)
 {
@@ -34,9 +46,7 @@ int main(void)
 
 	/* Handle input */
 
-	/* Loop events */
-
-	/* Handle events */
+	loop_events();
 
 	close_display_connection();
 
