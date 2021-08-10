@@ -22,8 +22,17 @@ static void (*event_handlers[LASTEvent])(XEvent *event) = {
 
 void handle_button_press(XEvent *event)
 {
-	(void)event;
-	puts("flowm: ButtonPress");
+	if (!event->xbutton.subwindow)
+		return;
+
+	XRaiseWindow(display, event->xbutton.subwindow);
+
+	XSetInputFocus(
+		display,
+		event->xbutton.subwindow,
+		RevertToParent,
+		CurrentTime
+	);
 }
 
 void handle_button_release(XEvent *event)
