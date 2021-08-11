@@ -9,33 +9,27 @@
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
 
-typedef struct {
-	const char *argv;
-} Arg;
-
-typedef struct {
-	unsigned int modifiers;
-	KeySym symbol;
-	void (*function)(const Arg arg);
-	const Arg arg;
-} KeyBinding;
+struct KeyBinding {
+	unsigned int modifier;
+	KeySym keysym;
+	void (*function)(char *command);
+	char *command;
+};
 
 typedef void (*EventHandler)(XEvent *e);
 
-static void close_display_connection(void);
-static void dummy_command(const Arg arg);
 static void grab_input(void);
 static void handle_button_press(XEvent *event);
 static void handle_key_press(XEvent *event);
 static void loop_events(void);
-static void open_display_connection(void);
+static void start_wm(void);
+static void stop_wm(void);
+static void spawn_process(char *command);
 
 static Display *display;
 
-static KeyBinding key_bindings[] = {
-	{ MOD | SHIFT, XK_1, dummy_command, { "foo" } },
-	{ MOD | SHIFT, XK_2, dummy_command, { "bar" } },
-	{ MOD | SHIFT, XK_3, dummy_command, { "baz" } },
+struct KeyBinding key_bindings[] = {
+	{ MOD, XK_Return, spawn_process, "xterm" },
 };
 
 static const EventHandler event_handler[LASTEvent] = {
@@ -43,39 +37,15 @@ static const EventHandler event_handler[LASTEvent] = {
 	[KeyPress] = handle_key_press,
 };
 
-void close_display_connection(void)
-{
-	XCloseDisplay(display);
-
-	puts("flowm: Closed display connection.");
-}
-
-void dummy_command(const Arg arg)
-{
-	printf("flowm: %s\n", &arg.argv[0]);
-}
-
-void open_display_connection(void)
-{
-	display = XOpenDisplay(NULL);
-
-	if (!display) {
-		puts("flowm: Failed to open display connection.");
-		exit(EXIT_FAILURE);
-	}
-
-	puts("flowm: Opened display connection.");
-}
-
 void grab_input(void)
 {
-	unsigned int i;
+	size_t i;
 
-	for (i = 0; i < sizeof(key_bindings)/sizeof(*key_bindings); i++)
+	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
 		XGrabKey(
 			display,
-			XKeysymToKeycode(display, key_bindings[i].symbol),
-			key_bindings[i].modifiers,
+			XKeysymToKeycode(display, key_bindings[i].keysym),
+			key_bindings[i].modifier,
 			DefaultRootWindow(display),
 			True,
 			GrabModeAsync,
@@ -113,17 +83,17 @@ void handle_button_press(XEvent *event)
 
 void handle_key_press(XEvent *event)
 {
-	KeySym symbol;
-	unsigned int i;
+	size_t i;
+	KeySym keysym;
 
-	symbol = XkbKeycodeToKeysym(display, event->xkey.keycode, 0, 0);
+	keysym = XkbKeycodeToKeysym(display, event->xkey.keycode, 0, 0);
 
-	if (!symbol)
+	if (!keysym)
 		return;
 
-	for (i = 0; i < sizeof(key_bindings)/sizeof(*key_bindings); i++)
-		if (symbol == key_bindings[i].symbol)
-			key_bindings[i].function(key_bindings[i].arg);
+	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
+		if (keysym == key_bindings[i].keysym)
+			key_bindings[i].function(key_bindings[i].command);
 }
 
 void loop_events(void)
@@ -138,12 +108,40 @@ void loop_events(void)
 	}
 }
 
+void start_wm(void)
+{
+	display = XOpenDisplay(NULL);
+
+	if (!display) {
+		fprintf(stderr, "flowm: Failed to open display connection\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void stop_wm(void)
+{
+	XCloseDisplay(display);
+}
+
+void spawn_process(char *command)
+{
+	if (fork() == 0) {
+		if (fork() == 0) {
+			if (display)
+				close(ConnectionNumber(display));
+
+			setsid();
+			execl("/bin/sh", "sh", "-c", command, NULL);
+		}
+	}
+}
+
 int main(void)
 {
-	open_display_connection();
+	start_wm();
 	grab_input();
 	loop_events();
-	close_display_connection();
+	stop_wm();
 
 	return EXIT_SUCCESS;
 }
