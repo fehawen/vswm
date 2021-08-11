@@ -9,6 +9,8 @@
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
 
+typedef struct KeyBinding KeyBinding;
+
 struct KeyBinding {
 	unsigned int modifier;
 	KeySym keysym;
@@ -18,6 +20,7 @@ struct KeyBinding {
 
 typedef void (*EventHandler)(XEvent *e);
 
+static int error_handler(Display *display, XErrorEvent *ev);
 static void grab_input(void);
 static void handle_button_press(XEvent *event);
 static void handle_key_press(XEvent *event);
@@ -27,8 +30,10 @@ static void stop_wm(void);
 static void spawn_process(char *command);
 
 static Display *display;
+static Window root;
+static int running = 0;
 
-struct KeyBinding key_bindings[] = {
+static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, "xterm" },
 };
 
@@ -36,6 +41,20 @@ static const EventHandler event_handler[LASTEvent] = {
 	[ButtonPress] = handle_button_press,
 	[KeyPress] = handle_key_press,
 };
+
+int error_handler(Display *display, XErrorEvent *event)
+{
+	(void)display;
+
+	if (!running
+	&& event->error_code == BadAccess
+	&& event->resourceid == root) {
+		fprintf(stderr, "flowm: Another WM is already running\n");
+		exit(EXIT_FAILURE);
+	}
+
+	return 0;
+}
 
 void grab_input(void)
 {
@@ -46,7 +65,7 @@ void grab_input(void)
 			display,
 			XKeysymToKeycode(display, key_bindings[i].keysym),
 			key_bindings[i].modifier,
-			DefaultRootWindow(display),
+			root,
 			True,
 			GrabModeAsync,
 			GrabModeAsync
@@ -56,7 +75,7 @@ void grab_input(void)
 		display,
 		1,
 		MOD,
-		DefaultRootWindow(display),
+		root,
 		True,
 		ButtonPressMask,
 		GrabModeAsync,
@@ -100,7 +119,7 @@ void loop_events(void)
 {
 	XEvent event;
 
-	while (1) {
+	while (running) {
 		XNextEvent(display, &event);
 
 		if (event_handler[event.type])
@@ -110,12 +129,18 @@ void loop_events(void)
 
 void start_wm(void)
 {
+	XSetErrorHandler(error_handler);
+
 	display = XOpenDisplay(NULL);
 
 	if (!display) {
-		fprintf(stderr, "flowm: Failed to open display connection\n");
+		fprintf(stderr, "flowm: Failed to open display\n");
 		exit(EXIT_FAILURE);
 	}
+
+	root = DefaultRootWindow(display);
+
+	running = 1;
 }
 
 void stop_wm(void)
@@ -132,6 +157,11 @@ void spawn_process(char *command)
 
 			setsid();
 			execl("/bin/sh", "sh", "-c", command, NULL);
+
+			exit(EXIT_FAILURE);
+		}
+		else {
+			exit(EXIT_SUCCESS);
 		}
 	}
 }
