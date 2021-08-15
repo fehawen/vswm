@@ -9,6 +9,7 @@
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
 #define TERMINAL "xterm"
+#define MENU "dmn"
 #define MOVE_EAST "me"
 #define MOVE_NORTH "mn"
 #define MOVE_SOUTH "ms"
@@ -62,6 +63,7 @@ static int screen_height;
 
 static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, TERMINAL },
+	{ MOD, XK_d, spawn_process, MENU },
 	{ MOD, XK_h, move_resize_client, MOVE_WEST },
 	{ MOD, XK_j, move_resize_client, MOVE_SOUTH },
 	{ MOD, XK_k, move_resize_client, MOVE_NORTH },
@@ -83,8 +85,7 @@ void add_client(Window window, XWindowAttributes *attributes)
 {
 	Client *client;
 
-	client = NULL;
-	client = calloc(1, sizeof(Client));
+	client = (Client *) calloc(1, sizeof(Client));
 
 	if (!client) {
 		fputs("flowm: Failed to calloc Client\n", stderr);
