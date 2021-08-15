@@ -5,6 +5,9 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
+#define MOVE_STEP 50
+#define RESIZE_STEP 50
+
 #define CTRL ControlMask
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
@@ -37,6 +40,7 @@ static void handle_button_press(XEvent *event);
 static void handle_key_press(XEvent *event);
 static void handle_map_request(XEvent *event);
 static void loop_events(void);
+static void move_resize_client(char *command);
 static void start_wm(void);
 static void stop_wm(void);
 static void spawn_process(char *command);
@@ -51,6 +55,14 @@ static int screen_height;
 
 static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, "xterm" },
+	{ MOD, XK_h, move_resize_client, "mw" },
+	{ MOD, XK_j, move_resize_client, "ms" },
+	{ MOD, XK_k, move_resize_client, "mn" },
+	{ MOD, XK_l, move_resize_client, "me" },
+	{ MOD | SHIFT, XK_h, move_resize_client, "rw" },
+	{ MOD | SHIFT, XK_j, move_resize_client, "rs" },
+	{ MOD | SHIFT, XK_k, move_resize_client, "rn" },
+	{ MOD | SHIFT, XK_l, move_resize_client, "re" },
 };
 
 static const EventHandler event_handler[LASTEvent] = {
@@ -76,6 +88,9 @@ void add_client(Window window, XWindowAttributes *attributes)
 	client->y = client->old_y = attributes->y;
 	client->height = client->old_height = attributes->height;
 	client->width = client->old_width = attributes->width;
+
+	/* Probably need to set default initial window size,
+	 * and possibly center window or set a default initial position */
 
 	XMapWindow(display, client->window);
 
@@ -204,6 +219,53 @@ void loop_events(void)
 
 		if (event_handler[event.type])
 			event_handler[event.type](&event);
+	}
+}
+
+void move_resize_client(char *command)
+{
+	char direction;
+	int move, height, width, x, y;
+
+	if (!focused_client)
+		return;
+
+	direction = command[1];
+	move = command[0] == 'm';
+	height = focused_client->height;
+	width = focused_client->width;
+	x = focused_client->x;
+	y = focused_client->y;
+
+	switch (direction) {
+		case 'n':
+			height = height - RESIZE_STEP;
+			y = y - MOVE_STEP;
+			break;
+		case 'e':
+			width = width + RESIZE_STEP;
+			x = x + MOVE_STEP;
+			break;
+		case 's':
+			height = height + RESIZE_STEP;
+			y = y + MOVE_STEP;
+			break;
+		case 'w':
+			width = width - RESIZE_STEP;
+			x = x - MOVE_STEP;
+			break;
+	}
+
+	if (move) {
+		XMoveWindow(display, focused_client->window, x, y);
+
+		focused_client->x = focused_client->old_x = x;
+		focused_client->y = focused_client->old_y = y;
+	} else {
+		XResizeWindow(display, focused_client->window, width, height);
+
+		focused_client->height = focused_client->old_height = height;
+		focused_client->width = focused_client->old_width = width;
 	}
 }
 
