@@ -20,6 +20,11 @@
 #define RESIZE_WEST "rw"
 #define MOVE_STEP 50
 #define RESIZE_STEP 50
+#define WINDOW_MIN_HEIGHT 100
+#define WINDOW_MIN_WIDTH 100
+
+/* Arguably common, but taken from TinyWM in this case */
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Client Client;
 typedef struct KeyBinding KeyBinding;
@@ -281,7 +286,7 @@ void move_resize_client(char *command)
 
 	switch (direction) {
 		case 'n':
-			height = height - RESIZE_STEP;
+			height = MAX(WINDOW_MIN_HEIGHT, height - RESIZE_STEP);
 			y = y - MOVE_STEP;
 			break;
 		case 'e':
@@ -293,7 +298,7 @@ void move_resize_client(char *command)
 			y = y + MOVE_STEP;
 			break;
 		case 'w':
-			width = width - RESIZE_STEP;
+			width = MAX(WINDOW_MIN_WIDTH, width - RESIZE_STEP);
 			x = x - MOVE_STEP;
 			break;
 	}
