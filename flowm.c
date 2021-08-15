@@ -16,10 +16,9 @@ typedef struct Client Client;
 typedef struct KeyBinding KeyBinding;
 
 struct Client {
-	int x, y;
-	int old_x, old_y;
+	int fullscreen;
 	int height, width;
-	int old_height, old_width;
+	int x, y;
 	Window window;
 };
 
@@ -35,6 +34,7 @@ typedef void (*EventHandler)(XEvent *e);
 static void add_client(Window window, XWindowAttributes *attributes);
 static unsigned long clean_mask(unsigned long mask);
 static int error_handler(Display *display, XErrorEvent *ev);
+static void fullscreen_client(char *command);
 static void grab_input(void);
 static void handle_button_press(XEvent *event);
 static void handle_key_press(XEvent *event);
@@ -63,6 +63,7 @@ static KeyBinding key_bindings[] = {
 	{ MOD | SHIFT, XK_j, move_resize_client, "rs" },
 	{ MOD | SHIFT, XK_k, move_resize_client, "rn" },
 	{ MOD | SHIFT, XK_l, move_resize_client, "re" },
+	{ MOD, XK_f, fullscreen_client, NULL },
 };
 
 static const EventHandler event_handler[LASTEvent] = {
@@ -84,10 +85,11 @@ void add_client(Window window, XWindowAttributes *attributes)
 	}
 
 	client->window = window;
-	client->x = client->old_x = attributes->x;
-	client->y = client->old_y = attributes->y;
-	client->height = client->old_height = attributes->height;
-	client->width = client->old_width = attributes->width;
+	client->x = attributes->x;
+	client->y = attributes->y;
+	client->height = attributes->height;
+	client->width = attributes->width;
+	client->fullscreen = 0;
 
 	/* Probably need to set default initial window size,
 	 * and possibly center window or set a default initial position */
@@ -128,6 +130,45 @@ int error_handler(Display *display, XErrorEvent *event)
 	}
 
 	return 0;
+}
+
+void fullscreen_client(char *command)
+{
+	int height, width, x, y;
+
+	(void)command;
+
+	if (!focused_client)
+		return;
+
+	/* Check override_redirect attributes to know if should be ignored */
+
+	if (focused_client->fullscreen) {
+		height = focused_client->height;
+		width = focused_client->width;
+
+		x = focused_client->x;
+		y = focused_client->y;
+
+		focused_client->fullscreen = 0;
+	} else {
+		height = screen_height;
+		width = screen_width;
+
+		x = 0;
+		y = 0;
+
+		focused_client->fullscreen = 1;
+	}
+
+	XMoveResizeWindow(
+		display,
+		focused_client->window,
+		x,
+		y,
+		width,
+		height
+	);
 }
 
 void grab_input(void)
@@ -180,6 +221,8 @@ void handle_key_press(XEvent *event)
 	KeySym key_sym;
 	XKeyEvent key_event;
 
+	/* Check override_redirect attributes to know if should be ignored */
+
 	key_event = event->xkey;
 	key_sym = XkbKeycodeToKeysym(display, key_event.keycode, 0, 0);
 
@@ -230,6 +273,11 @@ void move_resize_client(char *command)
 	if (!focused_client)
 		return;
 
+	/* Check override_redirect attributes to know if should be ignored */
+
+	if (focused_client->fullscreen)
+		return;
+
 	direction = command[1];
 	move = command[0] == 'm';
 	height = focused_client->height;
@@ -259,13 +307,13 @@ void move_resize_client(char *command)
 	if (move) {
 		XMoveWindow(display, focused_client->window, x, y);
 
-		focused_client->x = focused_client->old_x = x;
-		focused_client->y = focused_client->old_y = y;
+		focused_client->x = x;
+		focused_client->y = y;
 	} else {
 		XResizeWindow(display, focused_client->window, width, height);
 
-		focused_client->height = focused_client->old_height = height;
-		focused_client->width = focused_client->old_width = width;
+		focused_client->height = height;
+		focused_client->width = width;
 	}
 }
 
