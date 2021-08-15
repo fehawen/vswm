@@ -5,12 +5,20 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
-#define MOVE_STEP 50
-#define RESIZE_STEP 50
-
 #define CTRL ControlMask
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
+#define TERMINAL "xterm"
+#define MOVE_EAST "me"
+#define MOVE_NORTH "mn"
+#define MOVE_SOUTH "ms"
+#define MOVE_WEST "mw"
+#define RESIZE_EAST "re"
+#define RESIZE_NORTH "rn"
+#define RESIZE_SOUTH "rs"
+#define RESIZE_WEST "rw"
+#define MOVE_STEP 50
+#define RESIZE_STEP 50
 
 typedef struct Client Client;
 typedef struct KeyBinding KeyBinding;
@@ -53,15 +61,15 @@ static int screen_width;
 static int screen_height;
 
 static KeyBinding key_bindings[] = {
-	{ MOD, XK_Return, spawn_process, "xterm" },
-	{ MOD, XK_h, move_resize_client, "mw" },
-	{ MOD, XK_j, move_resize_client, "ms" },
-	{ MOD, XK_k, move_resize_client, "mn" },
-	{ MOD, XK_l, move_resize_client, "me" },
-	{ MOD | SHIFT, XK_h, move_resize_client, "rw" },
-	{ MOD | SHIFT, XK_j, move_resize_client, "rs" },
-	{ MOD | SHIFT, XK_k, move_resize_client, "rn" },
-	{ MOD | SHIFT, XK_l, move_resize_client, "re" },
+	{ MOD, XK_Return, spawn_process, TERMINAL },
+	{ MOD, XK_h, move_resize_client, MOVE_WEST },
+	{ MOD, XK_j, move_resize_client, MOVE_SOUTH },
+	{ MOD, XK_k, move_resize_client, MOVE_NORTH },
+	{ MOD, XK_l, move_resize_client, MOVE_EAST },
+	{ MOD | SHIFT, XK_h, move_resize_client, RESIZE_WEST },
+	{ MOD | SHIFT, XK_j, move_resize_client, RESIZE_SOUTH },
+	{ MOD | SHIFT, XK_k, move_resize_client, RESIZE_NORTH },
+	{ MOD | SHIFT, XK_l, move_resize_client, RESIZE_EAST },
 	{ MOD, XK_f, fullscreen_client, NULL },
 };
 
