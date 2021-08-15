@@ -9,29 +9,45 @@
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
 
+typedef struct Client Client;
 typedef struct KeyBinding KeyBinding;
+
+struct Client {
+	int x, y;
+	int old_x, old_y;
+	int height, width;
+	int old_height, old_width;
+	Window window;
+};
 
 struct KeyBinding {
 	unsigned int modifier;
-	KeySym keysym;
+	KeySym key_sym;
 	void (*function)(char *command);
 	char *command;
 };
 
 typedef void (*EventHandler)(XEvent *e);
 
+static void add_client(Window window, XWindowAttributes *attributes);
+static unsigned long clean_mask(unsigned long mask);
 static int error_handler(Display *display, XErrorEvent *ev);
 static void grab_input(void);
 static void handle_button_press(XEvent *event);
 static void handle_key_press(XEvent *event);
+static void handle_map_request(XEvent *event);
 static void loop_events(void);
 static void start_wm(void);
 static void stop_wm(void);
 static void spawn_process(char *command);
 
+static Client *focused_client;
 static Display *display;
 static Window root;
-static int running = 0;
+static int running;
+static int screen;
+static int screen_width;
+static int screen_height;
 
 static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, "xterm" },
@@ -40,7 +56,50 @@ static KeyBinding key_bindings[] = {
 static const EventHandler event_handler[LASTEvent] = {
 	[ButtonPress] = handle_button_press,
 	[KeyPress] = handle_key_press,
+	[MapRequest] = handle_map_request,
 };
+
+void add_client(Window window, XWindowAttributes *attributes)
+{
+	Client *client;
+
+	client = NULL;
+	client = calloc(1, sizeof(Client));
+
+	if (!client) {
+		fputs("flowm: Failed to calloc Client\n", stderr);
+		exit(EXIT_FAILURE);
+	}
+
+	client->window = window;
+	client->x = client->old_x = attributes->x;
+	client->y = client->old_y = attributes->y;
+	client->height = client->old_height = attributes->height;
+	client->width = client->old_width = attributes->width;
+
+	XMapWindow(display, client->window);
+
+	/* Might need XSelectInput here as well */
+
+	XSetInputFocus(display, client->window, RevertToParent, CurrentTime);
+
+	/* Might need to do more here */
+	focused_client = client;
+}
+
+/* Clean masks for each key (or mouse) event the way dwm does it */
+unsigned long clean_mask(unsigned long mask)
+{
+    return mask
+		& ~(0 | LockMask)
+		& (ShiftMask
+		| ControlMask
+		| Mod1Mask
+		| Mod2Mask
+		| Mod3Mask
+		| Mod4Mask
+		| Mod5Mask);
+}
 
 int error_handler(Display *display, XErrorEvent *event)
 {
@@ -49,7 +108,7 @@ int error_handler(Display *display, XErrorEvent *event)
 	if (!running
 	&& event->error_code == BadAccess
 	&& event->resourceid == root) {
-		fprintf(stderr, "flowm: Another WM is already running\n");
+		fputs("flowm: Another WM is already running\n", stderr);
 		exit(EXIT_FAILURE);
 	}
 
@@ -63,7 +122,7 @@ void grab_input(void)
 	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
 		XGrabKey(
 			display,
-			XKeysymToKeycode(display, key_bindings[i].keysym),
+			XKeysymToKeycode(display, key_bindings[i].key_sym),
 			key_bindings[i].modifier,
 			root,
 			True,
@@ -103,16 +162,37 @@ void handle_button_press(XEvent *event)
 void handle_key_press(XEvent *event)
 {
 	size_t i;
-	KeySym keysym;
+	KeySym key_sym;
+	XKeyEvent key_event;
 
-	keysym = XkbKeycodeToKeysym(display, event->xkey.keycode, 0, 0);
+	key_event = event->xkey;
+	key_sym = XkbKeycodeToKeysym(display, key_event.keycode, 0, 0);
 
-	if (!keysym)
+	if (!key_sym)
 		return;
 
 	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
-		if (keysym == key_bindings[i].keysym)
+		if (key_sym == key_bindings[i].key_sym
+		&& clean_mask(key_bindings[i].modifier == clean_mask(key_event.state)))
 			key_bindings[i].function(key_bindings[i].command);
+}
+
+void handle_map_request(XEvent *event)
+{
+	XWindowAttributes attributes;
+	XMapRequestEvent *request;
+
+	request = &event->xmaprequest;
+
+	if (!XGetWindowAttributes(display, request->window, &attributes))
+        return;
+
+	if (attributes.override_redirect)
+        return;
+
+	/* Might need XSelectInput here */
+
+	add_client(request->window, &attributes);
 }
 
 void loop_events(void)
@@ -129,6 +209,8 @@ void loop_events(void)
 
 void start_wm(void)
 {
+	XSetWindowAttributes attributes;
+
 	XSetErrorHandler(error_handler);
 
 	display = XOpenDisplay(NULL);
@@ -139,6 +221,25 @@ void start_wm(void)
 	}
 
 	root = DefaultRootWindow(display);
+	screen = DefaultScreen(display);
+
+	screen_width = XDisplayWidth(display, screen);
+	screen_height = XDisplayHeight(display, screen);
+
+	/* Figure out which of these we actually need... */
+	attributes.event_mask = SubstructureRedirectMask /* most likely */
+		| SubstructureNotifyMask /* most likely */
+		| ButtonPressMask /* most likely */
+		| PointerMotionMask /* probably not, unless move windows with mouse */
+		| EnterWindowMask /* probably not, no sloppy focus */
+		| LeaveWindowMask /* probably not, no sloppy focus */
+		| StructureNotifyMask /* most likely */
+		| PropertyChangeMask; /* most likely */
+
+	XChangeWindowAttributes(display, root, CWEventMask | CWCursor, &attributes);
+	XSelectInput(display, root, attributes.event_mask);
+
+	focused_client = NULL;
 
 	running = 1;
 }
@@ -146,8 +247,11 @@ void start_wm(void)
 void stop_wm(void)
 {
 	XCloseDisplay(display);
+
+	/* Free clients, etc */
 }
 
+/* Double fork to avoid zombie processes the way i3wm does it */
 void spawn_process(char *command)
 {
 	if (fork() == 0) {
