@@ -32,7 +32,6 @@ struct KeyBinding {
 typedef void (*EventHandler)(XEvent *e);
 
 static void add_client(Window window, XWindowAttributes *attributes);
-static unsigned long clean_mask(unsigned long mask);
 static int error_handler(Display *display, XErrorEvent *ev);
 static void fullscreen_client(char *command);
 static void grab_input(void);
@@ -104,27 +103,13 @@ void add_client(Window window, XWindowAttributes *attributes)
 	focused_client = client;
 }
 
-/* Clean masks for each key (or mouse) event the way dwm does it */
-unsigned long clean_mask(unsigned long mask)
-{
-    return mask
-		& ~(0 | LockMask)
-		& (ShiftMask
-		| ControlMask
-		| Mod1Mask
-		| Mod2Mask
-		| Mod3Mask
-		| Mod4Mask
-		| Mod5Mask);
-}
-
 int error_handler(Display *display, XErrorEvent *event)
 {
 	(void)display;
 
 	if (!running
-	&& event->error_code == BadAccess
-	&& event->resourceid == root) {
+		&& event->error_code == BadAccess
+		&& event->resourceid == root) {
 		fputs("flowm: Another WM is already running\n", stderr);
 		exit(EXIT_FAILURE);
 	}
@@ -231,7 +216,7 @@ void handle_key_press(XEvent *event)
 
 	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
 		if (key_sym == key_bindings[i].key_sym
-		&& clean_mask(key_bindings[i].modifier == clean_mask(key_event.state)))
+			&& key_bindings[i].modifier == key_event.state)
 			key_bindings[i].function(key_bindings[i].command);
 }
 
