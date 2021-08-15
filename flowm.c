@@ -46,6 +46,7 @@ struct KeyBinding {
 typedef void (*EventHandler)(XEvent *e);
 
 static void add_client(Window window, XWindowAttributes *attributes);
+static void center_client(char *command);
 static int error_handler(Display *display, XErrorEvent *ev);
 static void fullscreen_client(char *command);
 static void grab_input(void);
@@ -78,6 +79,7 @@ static KeyBinding key_bindings[] = {
 	{ MOD | SHIFT, XK_k, move_resize_client, RESIZE_NORTH },
 	{ MOD | SHIFT, XK_l, move_resize_client, RESIZE_EAST },
 	{ MOD, XK_f, fullscreen_client, NULL },
+	{ MOD, XK_c, center_client, NULL },
 };
 
 static const EventHandler event_handler[LASTEvent] = {
@@ -97,15 +99,13 @@ void add_client(Window window, XWindowAttributes *attributes)
 		exit(EXIT_FAILURE);
 	}
 
+	/* If height and width is greater than screen, set sane defaults */
 	client->window = window;
 	client->x = attributes->x;
 	client->y = attributes->y;
 	client->height = attributes->height;
 	client->width = attributes->width;
 	client->fullscreen = 0;
-
-	/* Probably need to set default initial window size,
-	 * and possibly center window or set a default initial position */
 
 	XMapWindow(display, client->window);
 
@@ -115,6 +115,26 @@ void add_client(Window window, XWindowAttributes *attributes)
 
 	/* Might need to do more here */
 	focused_client = client;
+
+	center_client(NULL);
+}
+
+void center_client(char *command)
+{
+	int x_center, y_center;
+
+	(void)command;
+
+	if (!focused_client)
+		return;
+
+	x_center = (screen_width - focused_client->width) / 2;
+	y_center = (screen_height - focused_client->height) / 2;
+
+	XMoveWindow(display, focused_client->window, x_center, y_center);
+
+	focused_client->x = x_center;
+	focused_client->y = y_center;
 }
 
 int error_handler(Display *display, XErrorEvent *event)
