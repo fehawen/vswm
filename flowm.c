@@ -237,10 +237,10 @@ void handle_map_request(XEvent *event)
 	window = event->xmaprequest.window;
 
 	if (!XGetWindowAttributes(display, window, &attributes))
-        return;
+		return;
 
 	if (attributes.override_redirect)
-        return;
+		return;
 
 	XSelectInput(display, window, StructureNotifyMask);
 	XMapWindow(display, window);
