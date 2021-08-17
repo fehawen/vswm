@@ -18,6 +18,14 @@
 #define RESIZE_NORTH "rn"
 #define RESIZE_SOUTH "rs"
 #define RESIZE_WEST "rw"
+#define SNAP_HALF_EAST "he"
+#define SNAP_HALF_NORTH "hn"
+#define SNAP_HALF_SOUTH "hs"
+#define SNAP_HALF_WEST "hw"
+#define SNAP_QUARTER_EAST "qe"
+#define SNAP_QUARTER_NORTH "qn"
+#define SNAP_QUARTER_SOUTH "qs"
+#define SNAP_QUARTER_WEST "qw"
 #define MOVE_STEP 50
 #define RESIZE_STEP 50
 #define WINDOW_MIN_HEIGHT 100
@@ -49,6 +57,7 @@ static void handle_map_request(XEvent *event);
 static void kill_window(char *command);
 static void loop_events(void);
 static void move_resize_window(char *command);
+static void snap_window(char *command);
 static void start_wm(void);
 static void stop_wm(void);
 static void spawn_process(char *command);
@@ -66,15 +75,23 @@ static int screen_height;
 /* Very similar to the way DWM, SOWM and many others do it */
 static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, TERMINAL },
-	{ MOD, XK_d, spawn_process, MENU },
-	{ MOD, XK_h, move_resize_window, MOVE_WEST },
-	{ MOD, XK_j, move_resize_window, MOVE_SOUTH },
-	{ MOD, XK_k, move_resize_window, MOVE_NORTH },
+	{ MOD, XK_m, spawn_process, MENU },
 	{ MOD, XK_l, move_resize_window, MOVE_EAST },
-	{ MOD | SHIFT, XK_h, move_resize_window, RESIZE_WEST },
-	{ MOD | SHIFT, XK_j, move_resize_window, RESIZE_SOUTH },
-	{ MOD | SHIFT, XK_k, move_resize_window, RESIZE_NORTH },
+	{ MOD, XK_k, move_resize_window, MOVE_NORTH },
+	{ MOD, XK_j, move_resize_window, MOVE_SOUTH },
+	{ MOD, XK_h, move_resize_window, MOVE_WEST },
 	{ MOD | SHIFT, XK_l, move_resize_window, RESIZE_EAST },
+	{ MOD | SHIFT, XK_k, move_resize_window, RESIZE_NORTH },
+	{ MOD | SHIFT, XK_j, move_resize_window, RESIZE_SOUTH },
+	{ MOD | SHIFT, XK_h, move_resize_window, RESIZE_WEST },
+	{ MOD, XK_d, snap_window, SNAP_QUARTER_EAST },
+	{ MOD, XK_w, snap_window, SNAP_QUARTER_NORTH },
+	{ MOD, XK_s, snap_window, SNAP_QUARTER_SOUTH },
+	{ MOD, XK_a, snap_window, SNAP_QUARTER_WEST },
+	{ MOD | SHIFT, XK_d, snap_window, SNAP_HALF_EAST },
+	{ MOD | SHIFT, XK_w, snap_window, SNAP_HALF_NORTH },
+	{ MOD | SHIFT, XK_s, snap_window, SNAP_HALF_SOUTH },
+	{ MOD | SHIFT, XK_a, snap_window, SNAP_HALF_WEST },
 	{ MOD, XK_f, fullscreen_window, NULL },
 	{ MOD, XK_c, center_window, NULL },
 	{ MOD | SHIFT, XK_q, kill_window, NULL },
@@ -325,6 +342,59 @@ void move_resize_window(char *command)
 		XMoveWindow(display, current, x, y);
 	else
 		XResizeWindow(display, current, width, height);
+}
+
+void snap_window(char *command)
+{
+	char direction;
+	int half, height, width, x, y;
+	XWindowAttributes attributes;
+
+	if (current_not_valid())
+		return;
+
+	if (!XGetWindowAttributes(display, current, &attributes))
+		return;
+
+	/* Gaspingly ugly approach, same as for move_resize_window,
+	 * but as already said it gets the job done. */
+	direction = command[1];
+	half = command[0] == 'h';
+
+	height = attributes.height;
+	width = attributes.width;
+
+	x = attributes.x;
+	y = attributes.y;
+
+	switch (direction) {
+		case 'n':
+			height = screen_height / 2;
+			width = half ? screen_width : (screen_width / 2);
+			y = 0;
+			x = 0;
+			break;
+		case 'e':
+			height = half ? screen_height : (screen_height / 2);
+			width = screen_width / 2;
+			y = 0;
+			x = screen_width / 2;
+			break;
+		case 's':
+			height = screen_height / 2;
+			width = half ? screen_width : (screen_width / 2);
+			y = screen_height / 2;
+			x = half ? 0 : (screen_width / 2);
+			break;
+		case 'w':
+			height = half ? screen_height : (screen_height / 2);
+			width = screen_width / 2;
+			y = half ? 0 : (screen_height / 2);
+			x = 0;
+			break;
+	}
+
+	XMoveResizeWindow(display, current, x, y, width, height);
 }
 
 void start_wm(void)
