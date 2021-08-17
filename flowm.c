@@ -177,28 +177,11 @@ void grab_input(void)
 	size_t i;
 
 	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
-		XGrabKey(
-			display,
-			XKeysymToKeycode(display, key_bindings[i].key_sym),
-			key_bindings[i].modifier,
-			root,
-			True,
-			GrabModeAsync,
-			GrabModeAsync
-		);
+		XGrabKey(display, XKeysymToKeycode(display, key_bindings[i].key_sym),
+			key_bindings[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
 
-	XGrabButton(
-		display,
-		1,
-		MOD,
-		root,
-		True,
-		ButtonPressMask,
-		GrabModeAsync,
-		GrabModeAsync,
-		None,
-		None
-	);
+	XGrabButton(display, 1, MOD, root, True, ButtonPressMask, GrabModeAsync,
+		GrabModeAsync, None, None);
 }
 
 void handle_button_press(XEvent *event)
