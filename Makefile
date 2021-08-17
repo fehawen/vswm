@@ -10,9 +10,8 @@ flowm: flowm.o
 	$(CC) -o $@ $^ $(LIBS) $(LDFLAGS)
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	cp -f flowm $(DESTDIR)$(BINDIR)
-	chmod 755 $(DESTDIR)$(BINDIR)/flowm
+	install -d $(DESTDIR)$(BINDIR)
+	install -m 755 flowm $(DESTDIR)$(BINDIR)
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/flowm
