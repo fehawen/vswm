@@ -5,63 +5,7 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
-#define CTRL ControlMask
-#define MOD Mod4Mask
-#define SHIFT ShiftMask
-#define TERMINAL "xterm"
-#define MENU "dmn"
-#define MOVE_EAST "me"
-#define MOVE_NORTH "mn"
-#define MOVE_SOUTH "ms"
-#define MOVE_WEST "mw"
-#define RESIZE_EAST "re"
-#define RESIZE_NORTH "rn"
-#define RESIZE_SOUTH "rs"
-#define RESIZE_WEST "rw"
-#define SNAP_HALF_EAST "he"
-#define SNAP_HALF_NORTH "hn"
-#define SNAP_HALF_SOUTH "hs"
-#define SNAP_HALF_WEST "hw"
-#define SNAP_QUARTER_EAST "qe"
-#define SNAP_QUARTER_NORTH "qn"
-#define SNAP_QUARTER_SOUTH "qs"
-#define SNAP_QUARTER_WEST "qw"
-#define MOVE_STEP 50
-#define RESIZE_STEP 50
-#define WINDOW_MIN_HEIGHT 100
-#define WINDOW_MIN_WIDTH 100
-
-/* Arguably common, but taken from TinyWM in this case */
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-typedef void (*EventHandler)(XEvent *event);
-typedef struct KeyBinding KeyBinding;
-
-struct KeyBinding {
-	unsigned int modifier;
-	KeySym key_sym;
-	void (*function)(char *command);
-	char *command;
-};
-
-static void center_window(char *command);
-static int current_not_valid(void);
-static int error_handler(Display *display, XErrorEvent *ev);
-static void focus_current(void);
-static void fullscreen_window(char *command);
-static void grab_input(void);
-static void handle_button_press(XEvent *event);
-static void handle_destroy_notify(XEvent *event);
-static void handle_key_press(XEvent *event);
-static void handle_map_request(XEvent *event);
-static void kill_window(char *command);
-static void loop_events(void);
-static void move_resize_window(char *command);
-static void snap_window(char *command);
-static void start_wm(void);
-static void stop_wm(void);
-static void spawn_process(char *command);
-static void quit(char *command);
+#include "flowm.h"
 
 static Window current;
 static Display *display;
@@ -72,7 +16,6 @@ static int screen;
 static int screen_width;
 static int screen_height;
 
-/* Very similar to the way DWM, SOWM and many others do it */
 static KeyBinding key_bindings[] = {
 	{ MOD, XK_Return, spawn_process, TERMINAL },
 	{ MOD, XK_m, spawn_process, MENU },
@@ -98,7 +41,6 @@ static KeyBinding key_bindings[] = {
 	{ MOD | CTRL | SHIFT, XK_x, quit, NULL },
 };
 
-/* Same goes for these... */
 static const EventHandler event_handler[LASTEvent] = {
 	[ButtonPress] = handle_button_press,
 	[DestroyNotify] = handle_destroy_notify,
