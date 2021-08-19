@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -418,6 +419,9 @@ void start_wm(void)
 		fprintf(stderr, "flowm: Failed to open display\n");
 		exit(EXIT_FAILURE);
 	}
+
+	/* ignore SIGCHLD signal to prevent zombie processes */
+	signal(SIGCHLD, SIG_IGN);
 
 	root = DefaultRootWindow(display);
 	screen = DefaultScreen(display);
