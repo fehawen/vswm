@@ -55,6 +55,7 @@ void handle_button_press(XEvent *event);
 void handle_destroy_notify(XEvent *event);
 void handle_key_press(XEvent *event);
 void handle_map_request(XEvent *event);
+void handle_unmap_notify(XEvent *event);
 void kill_window(char *command);
 void loop_events(void);
 void move_resize_window(char *command);
@@ -103,6 +104,7 @@ static const EventHandler event_handler[LASTEvent] = {
 	[DestroyNotify] = handle_destroy_notify,
 	[KeyPress] = handle_key_press,
 	[MapRequest] = handle_map_request,
+	[UnmapNotify] = handle_unmap_notify,
 };
 
 void center_window(char *command)
@@ -248,6 +250,13 @@ void handle_map_request(XEvent *event)
 
 	center_window(NULL);
 	focus_current();
+}
+
+void handle_unmap_notify(XEvent *event)
+{
+	/* If this came from a SendEvent request */
+	if (event->xunmap.send_event == 1)
+		XUnmapWindow(display, event->xunmap.window);
 }
 
 void kill_window(char *command)
