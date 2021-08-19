@@ -168,10 +168,28 @@ void fullscreen_window(char *command)
 {
 	(void)command;
 
+	int height, width, x, y;
+	XWindowAttributes attributes;
+
 	if (current_not_valid())
 		return;
 
-	XMoveResizeWindow(display, current, 0, 0, screen_width, screen_height);
+	if (!XGetWindowAttributes(display, current, &attributes))
+		return;
+
+	if (attributes.height == screen_height && attributes.width == screen_width) {
+		x = screen_width / 4;
+		y = screen_height / 4;
+		width = screen_width / 2;
+		height = screen_height / 2;
+	} else {
+		x = 0;
+		y = 0;
+		width = screen_width;
+		height = screen_height;
+	}
+
+	XMoveResizeWindow(display, current, x, y, width, height);
 }
 
 void grab_input(void)
