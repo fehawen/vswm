@@ -47,13 +47,14 @@ struct Key {
 static void center_window(char *command);
 static void create_dummy(void);
 static int current_not_valid(void);
-static int error_handler(Display *display, XErrorEvent *ev);
+static int error_handler(Display *display, XErrorEvent *event);
 static void focus_current(void);
 static void fullscreen_window(char *command);
 static void grab_input(void);
 static void handle_button_press(XEvent *event);
 static void handle_configure_request(XEvent *event);
 static void handle_key_press(XEvent *event);
+static void handle_mapping_notify(XEvent *event);
 static void handle_map_request(XEvent *event);
 static void handle_unmap_notify(XEvent *event);
 static void init_wm(void);
@@ -96,6 +97,7 @@ static const EventHandler event_handler[LASTEvent] = {
 	[ButtonPress] = handle_button_press,
 	[ConfigureRequest] = handle_configure_request,
 	[KeyPress] = handle_key_press,
+	[MappingNotify] = handle_mapping_notify,
 	[MapRequest] = handle_map_request,
 	[UnmapNotify] = handle_unmap_notify,
 };
@@ -129,7 +131,7 @@ void create_dummy(void)
 	XSetWindowAttributes attributes;
 
 	dummy = XCreateSimpleWindow(display, root, -2, -2, 1, 1, 0, 0, 0);
-	attributes.override_redirect = True ;
+	attributes.override_redirect = True;
 
 	XChangeWindowAttributes(display, dummy, CWOverrideRedirect, &attributes);
 	XMapWindow(display, dummy);
@@ -202,6 +204,9 @@ void grab_input(void)
 {
 	size_t i;
 
+	XUngrabKey(display, AnyKey, AnyModifier, root);
+	XUngrabButton(display, AnyButton, AnyModifier, root);
+
 	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
 		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
 			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
@@ -271,10 +276,20 @@ void handle_key_press(XEvent *event)
 			keys[i].function(keys[i].command);
 }
 
+void handle_mapping_notify(XEvent *event)
+{
+	XMappingEvent *mapping;
+
+	mapping = &event->xmapping;
+
+	XRefreshKeyboardMapping(mapping);
+	grab_input();
+}
+
 void handle_map_request(XEvent *event)
 {
-	XWindowAttributes attributes;
 	Window window;
+	XWindowAttributes attributes;
 
 	window = event->xmaprequest.window;
 
@@ -299,9 +314,12 @@ void handle_map_request(XEvent *event)
 
 void handle_unmap_notify(XEvent *event)
 {
-	/* If this came from a SendEvent request. */
-	if (event->xunmap.send_event == 1)
-		XUnmapWindow(display, event->xunmap.window);
+	(void)event;
+
+	if (!current || current == root) {
+		current = dummy;
+		focus_current();
+	}
 }
 
 void kill_window(char *command)
