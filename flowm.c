@@ -5,7 +5,6 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
-#define CTRL ControlMask
 #define MOD Mod4Mask
 #define SHIFT ShiftMask
 #define TERMINAL "xterm"
@@ -35,45 +34,41 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef void (*EventHandler)(XEvent *event);
-typedef struct KeyBinding KeyBinding;
+typedef struct Key Key;
 
 /* Very similar to the way DWM, SOWM and many others do it */
-struct KeyBinding {
+struct Key {
 	unsigned int modifier;
-	KeySym key_sym;
+	KeySym keysym;
 	void (*function)(char *command);
 	char *command;
 };
 
-void center_window(char *command);
-void create_dummy(void);
-int current_not_valid(void);
-int error_handler(Display *display, XErrorEvent *ev);
-void focus_current(void);
-void fullscreen_window(char *command);
-void grab_input(void);
-void handle_button_press(XEvent *event);
-void handle_configure_request(XEvent *event);
-void handle_key_press(XEvent *event);
-void handle_map_request(XEvent *event);
-void handle_unmap_notify(XEvent *event);
-void init_wm(void);
-void kill_window(char *command);
-void loop_events(void);
-void move_resize_window(char *command);
-void reset_window(void);
-void snap_window(char *command);
-void spawn_process(char *command);
+static void center_window(char *command);
+static void create_dummy(void);
+static int current_not_valid(void);
+static int error_handler(Display *display, XErrorEvent *ev);
+static void focus_current(void);
+static void fullscreen_window(char *command);
+static void grab_input(void);
+static void handle_button_press(XEvent *event);
+static void handle_configure_request(XEvent *event);
+static void handle_key_press(XEvent *event);
+static void handle_map_request(XEvent *event);
+static void handle_unmap_notify(XEvent *event);
+static void init_wm(void);
+static void kill_window(char *command);
+static void loop_events(void);
+static void move_resize_window(char *command);
+static void reset_window(void);
+static void snap_window(char *command);
+static void spawn_process(char *command);
 
-static Window current;
 static Display *display;
-static Window dummy;
-static Window root;
-static int screen;
-static int screen_width;
-static int screen_height;
+static Window root, current, dummy;
+static int screen, screen_width, screen_height;
 
-static KeyBinding key_bindings[] = {
+static Key keys[] = {
 	{ MOD, XK_Return, spawn_process, TERMINAL },
 	{ MOD, XK_m, spawn_process, MENU },
 	{ MOD, XK_l, move_resize_window, MOVE_EAST },
@@ -207,9 +202,9 @@ void grab_input(void)
 {
 	size_t i;
 
-	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
-		XGrabKey(display, XKeysymToKeycode(display, key_bindings[i].key_sym),
-			key_bindings[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
+	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
+		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
+			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
 
 	XGrabButton(display, 1, MOD, root, True, ButtonPressMask, GrabModeAsync,
 		GrabModeAsync, None, None);
@@ -249,13 +244,13 @@ void handle_configure_request(XEvent *event)
 void handle_key_press(XEvent *event)
 {
 	size_t i;
-	KeySym key_sym;
-	XKeyEvent *key_event;
+	KeySym keysym;
+	XKeyEvent *xkey;
 
-	key_event = &event->xkey;
-	key_sym = XkbKeycodeToKeysym(display, key_event->keycode, 0, 0);
+	xkey = &event->xkey;
+	keysym = XkbKeycodeToKeysym(display, xkey->keycode, 0, 0);
 
-	if (!key_sym)
+	if (!keysym)
 		return;
 
 	/*
@@ -271,10 +266,9 @@ void handle_key_press(XEvent *event)
 	 * bindings, but at the price of less code I can easily live
 	 * with that.
 	 */
-	for (i = 0; i < sizeof(key_bindings) / sizeof(struct KeyBinding); i++)
-		if (key_sym == key_bindings[i].key_sym
-			&& key_bindings[i].modifier == key_event->state)
-			key_bindings[i].function(key_bindings[i].command);
+	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
+		if (keysym == keys[i].keysym && keys[i].modifier == xkey->state)
+			keys[i].function(keys[i].command);
 }
 
 void handle_map_request(XEvent *event)
@@ -411,10 +405,8 @@ void snap_window(char *command)
 	 * */
 	direction = command[1];
 	half = command[0] == 'h';
-
 	height = attributes.height;
 	width = attributes.width;
-
 	x = attributes.x;
 	y = attributes.y;
 
