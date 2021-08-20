@@ -33,7 +33,7 @@
 /* Arguably common, but taken from TinyWM in this case */
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-typedef void (*EventHandler)(XEvent *event);
+typedef void (*Events)(XEvent *event);
 typedef struct Key Key;
 
 /* Very similar to the way DWM, SOWM and many others do it */
@@ -44,26 +44,26 @@ struct Key {
 	char *command;
 };
 
+static void button_press(XEvent *event);
 static void center_window(char *command);
+static void configure_request(XEvent *event);
 static void create_dummy(void);
-static int current_not_valid(void);
 static int error_handler(Display *display, XErrorEvent *event);
 static void focus_current(void);
 static void fullscreen_window(char *command);
 static void grab_input(void);
-static void handle_button_press(XEvent *event);
-static void handle_configure_request(XEvent *event);
-static void handle_key_press(XEvent *event);
-static void handle_mapping_notify(XEvent *event);
-static void handle_map_request(XEvent *event);
-static void handle_unmap_notify(XEvent *event);
 static void init_wm(void);
+static int invalid_current(void);
+static void key_press(XEvent *event);
 static void kill_window(char *command);
 static void loop_events(void);
+static void mapping_notify(XEvent *event);
+static void map_request(XEvent *event);
 static void move_resize_window(char *command);
 static void reset_window(void);
 static void snap_window(char *command);
 static void spawn_process(char *command);
+static void unmap_notify(XEvent *event);
 
 static Display *display;
 static Window root, current, dummy;
@@ -94,14 +94,28 @@ static Key keys[] = {
 	{ MOD | ShiftMask, XK_q, kill_window, 0 },
 };
 
-static const EventHandler event_handler[LASTEvent] = {
-	[ButtonPress] = handle_button_press,
-	[ConfigureRequest] = handle_configure_request,
-	[KeyPress] = handle_key_press,
-	[MappingNotify] = handle_mapping_notify,
-	[MapRequest] = handle_map_request,
-	[UnmapNotify] = handle_unmap_notify,
+static const Events events[LASTEvent] = {
+	[ButtonPress] = button_press,
+	[ConfigureRequest] = configure_request,
+	[KeyPress] = key_press,
+	[MappingNotify] = mapping_notify,
+	[MapRequest] = map_request,
+	[UnmapNotify] = unmap_notify,
 };
+
+void button_press(XEvent *event)
+{
+	Window window;
+
+	window = event->xbutton.subwindow;
+
+	if (window && window != dummy)
+		current = window;
+	else if (event->xbutton.window == root)
+		current = dummy;
+
+	focus_current();
+}
 
 void center_window(char *command)
 {
@@ -110,7 +124,7 @@ void center_window(char *command)
 
 	(void)command;
 
-	if (current_not_valid())
+	if (invalid_current())
 		return;
 
 	if (!XGetWindowAttributes(display, current, &attributes))
@@ -120,6 +134,23 @@ void center_window(char *command)
 	y = (screen_height - attributes.height) / 2;
 
 	XMoveWindow(display, current, x, y);
+}
+
+void configure_request(XEvent *event)
+{
+	XWindowChanges changes;
+	XConfigureRequestEvent *request;
+
+	request = &event->xconfigurerequest;
+
+	changes.x = request->x;
+	changes.y = request->y;
+	changes.width = request->width;
+	changes.height = request->height;
+	changes.sibling = request->above;
+	changes.stack_mode = request->detail;
+
+	XConfigureWindow(display, request->window, request->value_mask, &changes);
 }
 
 /*
@@ -138,14 +169,6 @@ void create_dummy(void)
 	XMapWindow(display, dummy);
 
 	current = dummy;
-}
-
-int current_not_valid(void)
-{
-	if (!current || current == dummy || current == root)
-		return 1;
-
-	return 0;
 }
 
 /* Just ignore all errors. */
@@ -176,7 +199,7 @@ void fullscreen_window(char *command)
 
 	XWindowAttributes attributes;
 
-	if (current_not_valid())
+	if (invalid_current())
 		return;
 
 	if (!XGetWindowAttributes(display, current, &attributes))
@@ -216,38 +239,36 @@ void grab_input(void)
 		GrabModeAsync, None, None);
 }
 
-void handle_button_press(XEvent *event)
+void init_wm(void)
 {
-	Window window;
+	display = XOpenDisplay(0);
 
-	window = event->xbutton.subwindow;
+	if (!display)
+		exit(1);
 
-	if (window && window != dummy)
-		current = window;
-	else if (event->xbutton.window == root)
-		current = dummy;
+	/* Ignore SIGCHLD, hopefully prevent zombie processes. */
+	signal(SIGCHLD, SIG_IGN);
 
-	focus_current();
+	root = DefaultRootWindow(display);
+	screen = DefaultScreen(display);
+	screen_width = XDisplayWidth(display, screen);
+	screen_height = XDisplayHeight(display, screen);
+
+	XSetErrorHandler(error_handler);
+	XSelectInput(display, root, SubstructureRedirectMask);
+
+	create_dummy();
 }
 
-void handle_configure_request(XEvent *event)
+int invalid_current(void)
 {
-	XWindowChanges changes;
-	XConfigureRequestEvent *request;
+	if (!current || current == dummy || current == root)
+		return 1;
 
-	request = &event->xconfigurerequest;
-
-	changes.x = request->x;
-	changes.y = request->y;
-	changes.width = request->width;
-	changes.height = request->height;
-	changes.sibling = request->above;
-	changes.stack_mode = request->detail;
-
-	XConfigureWindow(display, request->window, request->value_mask, &changes);
+	return 0;
 }
 
-void handle_key_press(XEvent *event)
+void key_press(XEvent *event)
 {
 	size_t i;
 	KeySym keysym;
@@ -277,7 +298,30 @@ void handle_key_press(XEvent *event)
 			keys[i].function(keys[i].command);
 }
 
-void handle_mapping_notify(XEvent *event)
+void kill_window(char *command)
+{
+	(void)command;
+
+	if (invalid_current())
+		return;
+
+	XKillClient(display, current);
+
+	current = dummy;
+	focus_current();
+}
+
+void loop_events(void)
+{
+	XEvent event;
+
+	while (1 && !XNextEvent(display, &event)) {
+		if (events[event.type])
+			events[event.type](&event);
+	}
+}
+
+void mapping_notify(XEvent *event)
 {
 	XMappingEvent *mapping;
 
@@ -287,7 +331,7 @@ void handle_mapping_notify(XEvent *event)
 	grab_input();
 }
 
-void handle_map_request(XEvent *event)
+void map_request(XEvent *event)
 {
 	Window window;
 	XWindowAttributes attributes;
@@ -313,46 +357,13 @@ void handle_map_request(XEvent *event)
 	focus_current();
 }
 
-void handle_unmap_notify(XEvent *event)
-{
-	(void)event;
-
-	if (!current || current == root) {
-		current = dummy;
-		focus_current();
-	}
-}
-
-void kill_window(char *command)
-{
-	(void)command;
-
-	if (current_not_valid())
-		return;
-
-	XKillClient(display, current);
-
-	current = dummy;
-	focus_current();
-}
-
-void loop_events(void)
-{
-	XEvent event;
-
-	while (1 && !XNextEvent(display, &event)) {
-		if (event_handler[event.type])
-			event_handler[event.type](&event);
-	}
-}
-
 void move_resize_window(char *command)
 {
 	char direction;
 	int move, height, width, x, y;
 	XWindowAttributes attributes;
 
-	if (current_not_valid())
+	if (invalid_current())
 		return;
 
 	if (!XGetWindowAttributes(display, current, &attributes))
@@ -398,7 +409,7 @@ void move_resize_window(char *command)
 
 void reset_window()
 {
-	if (current_not_valid())
+	if (invalid_current())
 		return;
 
 	XMoveResizeWindow(display, current,
@@ -412,7 +423,7 @@ void snap_window(char *command)
 	int half, height, width, x, y;
 	XWindowAttributes attributes;
 
-	if (current_not_valid())
+	if (invalid_current())
 		return;
 
 	if (!XGetWindowAttributes(display, current, &attributes))
@@ -459,27 +470,6 @@ void snap_window(char *command)
 	XMoveResizeWindow(display, current, x, y, width, height);
 }
 
-void init_wm(void)
-{
-	display = XOpenDisplay(0);
-
-	if (!display)
-		exit(1);
-
-	/* Ignore SIGCHLD, hopefully prevent zombie processes. */
-	signal(SIGCHLD, SIG_IGN);
-
-	root = DefaultRootWindow(display);
-	screen = DefaultScreen(display);
-	screen_width = XDisplayWidth(display, screen);
-	screen_height = XDisplayHeight(display, screen);
-
-	XSetErrorHandler(error_handler);
-	XSelectInput(display, root, SubstructureRedirectMask);
-
-	create_dummy();
-}
-
 /* Double fork to avoid zombie processes, the way i3WM does it. */
 void spawn_process(char *command)
 {
@@ -496,6 +486,16 @@ void spawn_process(char *command)
 		else {
 			exit(0);
 		}
+	}
+}
+
+void unmap_notify(XEvent *event)
+{
+	(void)event;
+
+	if (!current || current == root) {
+		current = dummy;
+		focus_current();
 	}
 }
 
