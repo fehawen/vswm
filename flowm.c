@@ -6,9 +6,9 @@
 #include <X11/Xlib.h>
 
 #define MOD Mod4Mask
-#define SHIFT ShiftMask
 #define TERMINAL "xterm"
-#define MENU "dmn"
+#define BROWSER "firefox"
+#define MENU "dmenu_run"
 #define MOVE_EAST "me"
 #define MOVE_NORTH "mn"
 #define MOVE_SOUTH "ms"
@@ -72,25 +72,26 @@ static int screen, screen_width, screen_height;
 static Key keys[] = {
 	{ MOD, XK_Return, spawn_process, TERMINAL },
 	{ MOD, XK_m, spawn_process, MENU },
+	{ MOD, XK_b, spawn_process, BROWSER },
 	{ MOD, XK_l, move_resize_window, MOVE_EAST },
 	{ MOD, XK_k, move_resize_window, MOVE_NORTH },
 	{ MOD, XK_j, move_resize_window, MOVE_SOUTH },
 	{ MOD, XK_h, move_resize_window, MOVE_WEST },
-	{ MOD | SHIFT, XK_l, move_resize_window, RESIZE_EAST },
-	{ MOD | SHIFT, XK_k, move_resize_window, RESIZE_NORTH },
-	{ MOD | SHIFT, XK_j, move_resize_window, RESIZE_SOUTH },
-	{ MOD | SHIFT, XK_h, move_resize_window, RESIZE_WEST },
+	{ MOD | ShiftMask, XK_l, move_resize_window, RESIZE_EAST },
+	{ MOD | ShiftMask, XK_k, move_resize_window, RESIZE_NORTH },
+	{ MOD | ShiftMask, XK_j, move_resize_window, RESIZE_SOUTH },
+	{ MOD | ShiftMask, XK_h, move_resize_window, RESIZE_WEST },
 	{ MOD, XK_d, snap_window, SNAP_QUARTER_EAST },
 	{ MOD, XK_w, snap_window, SNAP_QUARTER_NORTH },
 	{ MOD, XK_s, snap_window, SNAP_QUARTER_SOUTH },
 	{ MOD, XK_a, snap_window, SNAP_QUARTER_WEST },
-	{ MOD | SHIFT, XK_d, snap_window, SNAP_HALF_EAST },
-	{ MOD | SHIFT, XK_w, snap_window, SNAP_HALF_NORTH },
-	{ MOD | SHIFT, XK_s, snap_window, SNAP_HALF_SOUTH },
-	{ MOD | SHIFT, XK_a, snap_window, SNAP_HALF_WEST },
+	{ MOD | ShiftMask, XK_d, snap_window, SNAP_HALF_EAST },
+	{ MOD | ShiftMask, XK_w, snap_window, SNAP_HALF_NORTH },
+	{ MOD | ShiftMask, XK_s, snap_window, SNAP_HALF_SOUTH },
+	{ MOD | ShiftMask, XK_a, snap_window, SNAP_HALF_WEST },
 	{ MOD, XK_f, fullscreen_window, 0 },
 	{ MOD, XK_c, center_window, 0 },
-	{ MOD | SHIFT, XK_q, kill_window, 0 },
+	{ MOD | ShiftMask, XK_q, kill_window, 0 },
 };
 
 static const EventHandler event_handler[LASTEvent] = {
