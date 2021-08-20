@@ -257,6 +257,14 @@ void init_wm(void)
 	XSetErrorHandler(error_handler);
 	XSelectInput(display, root, SubstructureRedirectMask);
 
+	/*
+	 * Cursor the easy way, SOWM style.
+	 *
+	 * Resource:
+	 * https://tronche.com/gui/x/xlib/appendix/b/
+	 */
+	XDefineCursor(display, root, XCreateFontCursor(display, 68));
+
 	create_dummy();
 }
 
