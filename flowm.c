@@ -94,6 +94,7 @@ static Key keys[] = {
 	{ MOD | ShiftMask, XK_q, kill_window, 0 },
 };
 
+/* LASTEvent 36 */
 static const Events events[LASTEvent] = {
 	[ButtonPress] = button_press,
 	[ConfigureRequest] = configure_request,
