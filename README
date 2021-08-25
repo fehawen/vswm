@@ -1,4 +1,58 @@
-flowm - floating window manager
-===============================
+vswm - very stupid window manager
+=================================
 
-Work in progress.
+Probably the most stupid window manager every created, written over an ancient
+relic of a library called Xlib -- a library so old that it preceeded the birth
+of planet Earth itself.
+
+- All windows are fullscreen.
+- Windows can not be moved or resized.
+- There are no workspaces.
+
+
+Keybindings
+-----------
+
+MOD4 + Return            xterm
+MOD4 + d                 dmn
+MOD4 + b                 chromium
+MOD4 + p                 scr
+MOD4 + Shift + q         kill window
+MOD4 + Tab               focus next window
+MOD4 + Shift + Tab       focus prev window
+XF86_AudioMute           pamixer -t
+XF86_AudioLowerVolume    pamixer -d 5
+XF86_AudioRaiseVolume    pamixer -i 5
+XF86_MonBrightnessDown   xbacklight -dec 5
+XF86_MonBrightnessUp     xbacklight -inc 5
+
+
+Configuration
+-------------
+
+Change the keybindings in the source code to your liking.
+
+
+Dependencies
+------------
+
+You need the Xlib header files.
+
+
+Installation
+------------
+
+DESTDIR and PREFIX are supported.
+
+    $ make clean install
+
+
+Credits
+-------
+
+i3: https://github.com/i3/i3
+dwm: https://git.suckless.org/dwm
+sowm: https://github.com/dylanaraps/sowm
+berry: https://github.com/JLErvin/berry
+tinywm: http://incise.org/tinywm.html
+katriawm: https://www.uninformativ.de/git/katriawm

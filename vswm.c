@@ -16,23 +16,16 @@ struct Key {
 	char *command;
 };
 
-static void init(void);
-static void grab(void);
-static void loop(void);
-
-static int ignore(Display *display, XErrorEvent *event);
-
 static void enter(XEvent *event);
 static void configure(XEvent *event);
 static void key(XEvent *event);
 static void map(XEvent *event);
-static void mapping(XEvent *event);
-static void unmap(XEvent *event);
 
-static void next(XEvent *event, char *command);
-static void prev(XEvent *event, char *command);
+static void focus(XEvent *event, char *command);
 static void launch(XEvent *event, char *command);
 static void destroy(XEvent *event, char *command);
+
+static int ignore(Display *display, XErrorEvent *event);
 
 static Display *display;
 static Window root;
@@ -44,8 +37,8 @@ static Key keys[] = {
 	{ Mod4Mask, XK_b, launch, "chromium" },
 	{ Mod4Mask, XK_p, launch, "scr" },
 	{ Mod4Mask | ShiftMask, XK_q, destroy, 0 },
-	{ Mod4Mask, XK_Tab, next, 0 },
-	{ Mod4Mask | ShiftMask, XK_Tab, prev, 0 },
+	{ Mod4Mask, XK_Tab, focus, "next" },
+	{ Mod4Mask | ShiftMask, XK_Tab, focus, "prev" },
 	{ 0, XF86XK_AudioMute, launch, "pamixer -t" },
 	{ 0, XF86XK_AudioLowerVolume, launch, "pamixer -d 5" },
 	{ 0, XF86XK_AudioRaiseVolume, launch, "pamixer -i 5" },
@@ -58,47 +51,7 @@ static const Events events[LASTEvent] = {
 	[EnterNotify] = enter,
 	[KeyPress] = key,
 	[MapRequest] = map,
-	[MappingNotify] = mapping,
-	[UnmapNotify] = unmap,
 };
-
-void init(void)
-{
-	if (!(display = XOpenDisplay(0)))
-		exit(1);
-
-	XSetErrorHandler(ignore);
-
-	signal(SIGCHLD, SIG_IGN);
-
-	root = DefaultRootWindow(display);
-	screen = DefaultScreen(display);
-	width = XDisplayWidth(display, screen);
-	height = XDisplayHeight(display, screen);
-
-	XSelectInput(display, root, SubstructureRedirectMask);
-}
-
-void grab(void)
-{
-	size_t i;
-
-	XUngrabKey(display, AnyKey, AnyModifier, root);
-
-	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
-		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
-			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
-}
-
-void loop(void)
-{
-	XEvent event;
-
-	while (1 && !XNextEvent(display, &event)) {
-		if (events[event.type])
-			events[event.type](&event);
-	}
-}
 
 int ignore(Display *display, XErrorEvent *event)
 {
@@ -117,16 +70,16 @@ void enter(XEvent *event) {
 
 void configure(XEvent *event)
 {
-	XWindowChanges changes;
 	XConfigureRequestEvent *request = &event->xconfigurerequest;
-
-	changes.x = request->x;
-	changes.y = request->y;
-	changes.width = request->width;
-	changes.height = request->height;
-	changes.border_width = request->border_width;
-	changes.sibling = request->above;
-	changes.stack_mode = request->detail;
+	XWindowChanges changes = {
+		.x = request->x,
+		.y = request->y,
+		.width = request->width,
+		.height = request->height,
+		.border_width = request->border_width,
+		.sibling = request->above,
+		.stack_mode = request->detail,
+	};
 
 	XConfigureWindow(display, request->window, request->value_mask, &changes);
 }
@@ -143,49 +96,21 @@ void key(XEvent *event)
 
 void map(XEvent *event)
 {
-	XWindowAttributes attributes;
 	Window window = event->xmaprequest.window;
 	XWindowChanges changes = { .border_width = 0 };
 
-	if (!XGetWindowAttributes(display, window, &attributes))
-		return;
-
-	if (attributes.override_redirect)
-		return;
-
 	XSelectInput(display, window, StructureNotifyMask | EnterWindowMask);
-    XConfigureWindow(display, window, CWBorderWidth, &changes);
+	XConfigureWindow(display, window, CWBorderWidth, &changes);
 	XMoveResizeWindow(display, window, 0, 0, width, height);
 	XMapWindow(display, window);
 }
 
-void mapping(XEvent *event)
-{
-	XRefreshKeyboardMapping(&event->xmapping);
-
-	if (event->xmapping.request == MappingKeyboard)
-		grab();
-}
-
-void unmap(XEvent *event)
-{
-	XUnmapWindow(display, event->xunmap.window);
-}
-
-void next(XEvent *event, char *command)
+void focus(XEvent *event, char *command)
 {
 	(void)event;
-	(void)command;
+	int next = command[0] == 'n';
 
-	XCirculateSubwindowsUp(display, root);
-}
-
-void prev(XEvent *event, char *command)
-{
-	(void)event;
-	(void)command;
-
-	XCirculateSubwindowsDown(display, root);
+	XCirculateSubwindows(display, root, next ? RaiseLowest : LowerHighest);
 }
 
 void launch(XEvent *event, char *command)
@@ -218,7 +143,29 @@ void destroy(XEvent *event, char *command)
 
 int main(void)
 {
-	init();
-	grab();
-	loop();
+	size_t i;
+	XEvent event;
+
+	if (!(display = XOpenDisplay(0)))
+		exit(1);
+
+	XSetErrorHandler(ignore);
+
+	signal(SIGCHLD, SIG_IGN);
+
+	root = DefaultRootWindow(display);
+	screen = DefaultScreen(display);
+	width = XDisplayWidth(display, screen);
+	height = XDisplayHeight(display, screen);
+
+	XSelectInput(display, root, SubstructureRedirectMask);
+
+	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
+		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
+			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
+
+	while (1 && !XNextEvent(display, &event)) {
+		if (events[event.type])
+			events[event.type](&event);
+	}
 }

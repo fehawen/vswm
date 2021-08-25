@@ -4,19 +4,19 @@ PREFIX ?= /usr
 BINDIR ?= $(PREFIX)/bin
 CC ?= gcc
 
-all: flowm
+all: vswm
 
-flowm: flowm.o
+vswm: vswm.o
 	$(CC) -o $@ $^ $(LIBS) $(LDFLAGS)
 
 install: all
 	install -d $(DESTDIR)$(BINDIR)
-	install -m 755 flowm $(DESTDIR)$(BINDIR)
+	install -m 755 vswm $(DESTDIR)$(BINDIR)
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/flowm
+	rm -f $(DESTDIR)$(BINDIR)/vswm
 
 clean:
-	rm -f flowm *.o
+	rm -f vswm *.o
 
 .PHONY: all install uninstall clean
