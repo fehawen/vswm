@@ -5,32 +5,36 @@ Probably the most stupid window manager every created, written over an ancient
 relic of a library called Xlib -- a library so old that it preceeded the birth
 of planet Earth itself.
 
-- All windows are fullscreen.
-- Windows can not be moved or resized.
 - There are no workspaces.
+- All windows are maximized.
+- Windows can not be moved or resized.
+- Windows can have outer gaps.
+- Windows can have borders.
 
 
 Keybindings
 -----------
 
-MOD4 + Return            xterm
-MOD4 + d                 dmn
-MOD4 + b                 chromium
-MOD4 + p                 scr
-MOD4 + Shift + q         kill window
 MOD4 + Tab               focus next window
 MOD4 + Shift + Tab       focus prev window
-XF86_AudioMute           pamixer -t
-XF86_AudioLowerVolume    pamixer -d 5
-XF86_AudioRaiseVolume    pamixer -i 5
+MOD4 + Shift + q         kill window
+
+MOD4 + b                 chromium
+MOD4 + Return            xterm
+MOD4 + d                 dmn
+MOD4 + p                 scr
+
 XF86_MonBrightnessDown   xbacklight -dec 5
 XF86_MonBrightnessUp     xbacklight -inc 5
+XF86_AudioLowerVolume    pamixer -d 5
+XF86_AudioRaiseVolume    pamixer -i 5
+XF86_AudioMute           pamixer -t
 
 
 Configuration
 -------------
 
-Change the keybindings in the source code to your liking.
+Modify the source code to change borders, gaps and keybindings to your liking.
 
 
 Dependencies
