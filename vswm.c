@@ -6,6 +6,13 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
+#define BORDER_WIDTH 3
+#define BORDER_COLOR 0x24292e
+#define GAP_TOP 30
+#define GAP_RIGHT 30
+#define GAP_BOTTOM 80
+#define GAP_LEFT 30
+
 typedef struct Key Key;
 typedef void (*Events)(XEvent *event);
 
@@ -97,11 +104,12 @@ void key(XEvent *event)
 void map(XEvent *event)
 {
 	Window window = event->xmaprequest.window;
-	XWindowChanges changes = { .border_width = 0 };
+	XWindowChanges changes = { .border_width = BORDER_WIDTH };
 
 	XSelectInput(display, window, StructureNotifyMask | EnterWindowMask);
+	XSetWindowBorder(display, window, BORDER_COLOR);
 	XConfigureWindow(display, window, CWBorderWidth, &changes);
-	XMoveResizeWindow(display, window, 0, 0, width, height);
+	XMoveResizeWindow(display, window, GAP_TOP, GAP_LEFT, width, height);
 	XMapWindow(display, window);
 }
 
@@ -155,8 +163,12 @@ int main(void)
 
 	root = DefaultRootWindow(display);
 	screen = DefaultScreen(display);
-	width = XDisplayWidth(display, screen);
-	height = XDisplayHeight(display, screen);
+
+	width = XDisplayWidth(display, screen) - \
+		(GAP_RIGHT + GAP_LEFT + (BORDER_WIDTH * 2));
+
+	height = XDisplayHeight(display, screen) - \
+		(GAP_TOP + GAP_BOTTOM + (BORDER_WIDTH * 2));
 
 	XSelectInput(display, root, SubstructureRedirectMask);
 
