@@ -171,6 +171,7 @@ int main(void)
 		(GAP_TOP + GAP_BOTTOM + (BORDER_WIDTH * 2));
 
 	XSelectInput(display, root, SubstructureRedirectMask);
+	XDefineCursor(display, root, XCreateFontCursor(display, 68));
 
 	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
 		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
