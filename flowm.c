@@ -2,325 +2,95 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <X11/keysym.h>
+#include <X11/XF86keysym.h>
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
-#define MOD Mod4Mask
-#define TERMINAL "xterm"
-#define BROWSER "firefox"
-#define MENU "dmenu_run"
-#define MOVE_EAST "me"
-#define MOVE_NORTH "mn"
-#define MOVE_SOUTH "ms"
-#define MOVE_WEST "mw"
-#define RESIZE_EAST "re"
-#define RESIZE_NORTH "rn"
-#define RESIZE_SOUTH "rs"
-#define RESIZE_WEST "rw"
-#define SNAP_HALF_EAST "he"
-#define SNAP_HALF_NORTH "hn"
-#define SNAP_HALF_SOUTH "hs"
-#define SNAP_HALF_WEST "hw"
-#define SNAP_QUARTER_EAST "qe"
-#define SNAP_QUARTER_NORTH "qn"
-#define SNAP_QUARTER_SOUTH "qs"
-#define SNAP_QUARTER_WEST "qw"
-#define MOVE_STEP 50
-#define RESIZE_STEP 50
-#define WINDOW_MIN_HEIGHT 100
-#define WINDOW_MIN_WIDTH 100
-
-/* Arguably common, but taken from TinyWM in this case */
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-typedef void (*Events)(XEvent *event);
 typedef struct Key Key;
+typedef void (*Events)(XEvent *event);
 
-/* Very similar to the way DWM, SOWM and many others do it */
 struct Key {
 	unsigned int modifier;
 	KeySym keysym;
-	void (*function)(char *command);
+	void (*function)(XEvent *event, char *command);
 	char *command;
 };
 
-static void button_press(XEvent *event);
-static void center_window(char *command);
-static void configure_request(XEvent *event);
-static void create_dummy(void);
-static int error_handler(Display *display, XErrorEvent *event);
-static void focus_current(void);
-static void fullscreen_window(char *command);
-static void grab_input(void);
-static void init_wm(void);
-static int invalid_current(void);
-static void key_press(XEvent *event);
-static void kill_window(char *command);
-static void loop_events(void);
-static void mapping_notify(XEvent *event);
-static void map_request(XEvent *event);
-static void move_resize_window(char *command);
-static void reset_window(void);
-static void snap_window(char *command);
-static void spawn_process(char *command);
-static void unmap_notify(XEvent *event);
+static void init(void);
+static void grab(void);
+static void loop(void);
+
+static int ignore(Display *display, XErrorEvent *event);
+
+static void enter(XEvent *event);
+static void configure(XEvent *event);
+static void key(XEvent *event);
+static void map(XEvent *event);
+static void mapping(XEvent *event);
+static void unmap(XEvent *event);
+
+static void next(XEvent *event, char *command);
+static void prev(XEvent *event, char *command);
+static void launch(XEvent *event, char *command);
+static void destroy(XEvent *event, char *command);
 
 static Display *display;
-static Window root, current, dummy;
-static int screen, screen_width, screen_height;
+static Window root;
+static int screen, width, height;
 
 static Key keys[] = {
-	{ MOD, XK_Return, spawn_process, TERMINAL },
-	{ MOD, XK_m, spawn_process, MENU },
-	{ MOD, XK_b, spawn_process, BROWSER },
-	{ MOD, XK_l, move_resize_window, MOVE_EAST },
-	{ MOD, XK_k, move_resize_window, MOVE_NORTH },
-	{ MOD, XK_j, move_resize_window, MOVE_SOUTH },
-	{ MOD, XK_h, move_resize_window, MOVE_WEST },
-	{ MOD | ShiftMask, XK_l, move_resize_window, RESIZE_EAST },
-	{ MOD | ShiftMask, XK_k, move_resize_window, RESIZE_NORTH },
-	{ MOD | ShiftMask, XK_j, move_resize_window, RESIZE_SOUTH },
-	{ MOD | ShiftMask, XK_h, move_resize_window, RESIZE_WEST },
-	{ MOD, XK_d, snap_window, SNAP_QUARTER_EAST },
-	{ MOD, XK_w, snap_window, SNAP_QUARTER_NORTH },
-	{ MOD, XK_s, snap_window, SNAP_QUARTER_SOUTH },
-	{ MOD, XK_a, snap_window, SNAP_QUARTER_WEST },
-	{ MOD | ShiftMask, XK_d, snap_window, SNAP_HALF_EAST },
-	{ MOD | ShiftMask, XK_w, snap_window, SNAP_HALF_NORTH },
-	{ MOD | ShiftMask, XK_s, snap_window, SNAP_HALF_SOUTH },
-	{ MOD | ShiftMask, XK_a, snap_window, SNAP_HALF_WEST },
-	{ MOD, XK_f, fullscreen_window, 0 },
-	{ MOD, XK_c, center_window, 0 },
-	{ MOD | ShiftMask, XK_q, kill_window, 0 },
+	{ Mod4Mask, XK_Return, launch, "xterm" },
+	{ Mod4Mask, XK_d, launch, "dmn" },
+	{ Mod4Mask, XK_b, launch, "chromium" },
+	{ Mod4Mask, XK_p, launch, "scr" },
+	{ Mod4Mask | ShiftMask, XK_q, destroy, 0 },
+	{ Mod4Mask, XK_Tab, next, 0 },
+	{ Mod4Mask | ShiftMask, XK_Tab, prev, 0 },
+	{ 0, XF86XK_AudioMute, launch, "pamixer -t" },
+	{ 0, XF86XK_AudioLowerVolume, launch, "pamixer -d 5" },
+	{ 0, XF86XK_AudioRaiseVolume, launch, "pamixer -i 5" },
+	{ 0, XF86XK_MonBrightnessDown, launch, "xbacklight -dec 5" },
+	{ 0, XF86XK_MonBrightnessUp, launch, "xbacklight -inc 5" },
 };
 
-/* LASTEvent 36 */
 static const Events events[LASTEvent] = {
-	[ButtonPress] = button_press,
-	[ConfigureRequest] = configure_request,
-	[KeyPress] = key_press,
-	[MappingNotify] = mapping_notify,
-	[MapRequest] = map_request,
-	[UnmapNotify] = unmap_notify,
+	[ConfigureRequest] = configure,
+	[EnterNotify] = enter,
+	[KeyPress] = key,
+	[MapRequest] = map,
+	[MappingNotify] = mapping,
+	[UnmapNotify] = unmap,
 };
 
-void button_press(XEvent *event)
+void init(void)
 {
-	Window window;
-
-	window = event->xbutton.subwindow;
-
-	if (window && window != dummy)
-		current = window;
-	else if (event->xbutton.window == root)
-		current = dummy;
-
-	focus_current();
-}
-
-void center_window(char *command)
-{
-	int x, y;
-	XWindowAttributes attributes;
-
-	(void)command;
-
-	if (invalid_current())
-		return;
-
-	if (!XGetWindowAttributes(display, current, &attributes))
-		return;
-
-	x = (screen_width - attributes.width) / 2;
-	y = (screen_height - attributes.height) / 2;
-
-	XMoveWindow(display, current, x, y);
-}
-
-void configure_request(XEvent *event)
-{
-	XWindowChanges changes;
-	XConfigureRequestEvent *request;
-
-	request = &event->xconfigurerequest;
-
-	changes.x = request->x;
-	changes.y = request->y;
-	changes.width = request->width;
-	changes.height = request->height;
-	changes.sibling = request->above;
-	changes.stack_mode = request->detail;
-
-	XConfigureWindow(display, request->window, request->value_mask, &changes);
-}
-
-/*
- * Create a focus fallback dummy and hide the bastard,
- * we just use it to prevent focusing the root window,
- * which I've been told is bad.
- */
-void create_dummy(void)
-{
-	XSetWindowAttributes attributes;
-
-	dummy = XCreateSimpleWindow(display, root, -2, -2, 1, 1, 0, 0, 0);
-	attributes.override_redirect = True;
-
-	XChangeWindowAttributes(display, dummy, CWOverrideRedirect, &attributes);
-	XMapWindow(display, dummy);
-
-	current = dummy;
-}
-
-/* Just ignore all errors. */
-int error_handler(Display *display, XErrorEvent *event)
-{
-	(void)display;
-	(void)event;
-
-	return 0;
-}
-
-void focus_current(void)
-{
-	/* Just to be paranoidly safe. */
-	if (!current || current == root) {
-		current = dummy;
-		focus_current();
-		return;
-	}
-
-	XSetInputFocus(display, current, RevertToParent, CurrentTime);
-	XRaiseWindow(display, current);
-}
-
-void fullscreen_window(char *command)
-{
-	(void)command;
-
-	XWindowAttributes attributes;
-
-	if (invalid_current())
-		return;
-
-	if (!XGetWindowAttributes(display, current, &attributes))
-		return;
-
-	/*
-	 * Since we don't compose any sort of Clients, and just
-	 * deal with Windows directly, our only way to detect if
-	 * a window's already fullscreen is to check if it's the
-	 * same size as our root window, and naively assume that
-	 * if this is the case, the window's fullscreen.
-	 *
-	 * And if it is, we just center it and give it a size of
-	 * half the screen width and height.
-	 *
-	 * Annoying to some; a sane solution to me.
-	 */
-	if (attributes.height == screen_height && attributes.width == screen_width)
-		reset_window();
-	else
-		XMoveResizeWindow(display, current, 0, 0, screen_width, screen_height);
-
-}
-
-void grab_input(void)
-{
-	size_t i;
-
-	XUngrabKey(display, AnyKey, AnyModifier, root);
-	XUngrabButton(display, AnyButton, AnyModifier, root);
-
-	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
-		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
-			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
-
-	XGrabButton(display, 1, MOD, root, True, ButtonPressMask, GrabModeAsync,
-		GrabModeAsync, None, None);
-}
-
-void init_wm(void)
-{
-	display = XOpenDisplay(0);
-
-	if (!display)
+	if (!(display = XOpenDisplay(0)))
 		exit(1);
 
-	/* Ignore SIGCHLD, hopefully prevent zombie processes. */
+	XSetErrorHandler(ignore);
+
 	signal(SIGCHLD, SIG_IGN);
 
 	root = DefaultRootWindow(display);
 	screen = DefaultScreen(display);
-	screen_width = XDisplayWidth(display, screen);
-	screen_height = XDisplayHeight(display, screen);
+	width = XDisplayWidth(display, screen);
+	height = XDisplayHeight(display, screen);
 
-	XSetErrorHandler(error_handler);
 	XSelectInput(display, root, SubstructureRedirectMask);
-
-	/*
-	 * Cursor the easy way, SOWM style.
-	 *
-	 * Resource:
-	 * https://tronche.com/gui/x/xlib/appendix/b/
-	 */
-	XDefineCursor(display, root, XCreateFontCursor(display, 68));
-
-	create_dummy();
 }
 
-int invalid_current(void)
-{
-	if (!current || current == dummy || current == root)
-		return 1;
-
-	return 0;
-}
-
-void key_press(XEvent *event)
+void grab(void)
 {
 	size_t i;
-	KeySym keysym;
-	XKeyEvent *xkey;
 
-	xkey = &event->xkey;
-	keysym = XkbKeycodeToKeysym(display, xkey->keycode, 0, 0);
+	XUngrabKey(display, AnyKey, AnyModifier, root);
 
-	if (!keysym)
-		return;
-
-	/*
-	 * The common clean mask approach, along the lines of
-	 * `mask & ~(0|LockMask) & (ShiftMask|ControlMask|Mod1Mask...)`
-	 * does not _seem_ to be necessary if we just compare modifier
-	 * to state directly?
-	 *
-	 * But I could be wrong (and probably am), although I haven't
-	 * ran into any issues by doig it this way so far...
-	 *
-	 * Of course, capslock and numlock etc will break our key
-	 * bindings, but at the price of less code I can easily live
-	 * with that.
-	 */
 	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
-		if (keysym == keys[i].keysym && keys[i].modifier == xkey->state)
-			keys[i].function(keys[i].command);
+		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
+			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
 }
 
-void kill_window(char *command)
-{
-	(void)command;
-
-	if (invalid_current())
-		return;
-
-	XKillClient(display, current);
-
-	current = dummy;
-	focus_current();
-}
-
-void loop_events(void)
+void loop(void)
 {
 	XEvent event;
 
@@ -330,22 +100,52 @@ void loop_events(void)
 	}
 }
 
-void mapping_notify(XEvent *event)
+int ignore(Display *display, XErrorEvent *event)
 {
-	XMappingEvent *mapping;
+	(void)display;
+	(void)event;
 
-	mapping = &event->xmapping;
-
-	XRefreshKeyboardMapping(mapping);
-	grab_input();
+	return 0;
 }
 
-void map_request(XEvent *event)
-{
-	Window window;
-	XWindowAttributes attributes;
+void enter(XEvent *event) {
+	Window window = event->xcrossing.window;
 
-	window = event->xmaprequest.window;
+	XSetInputFocus(display, window, RevertToParent, CurrentTime);
+	XRaiseWindow(display, window);
+}
+
+void configure(XEvent *event)
+{
+	XWindowChanges changes;
+	XConfigureRequestEvent *request = &event->xconfigurerequest;
+
+	changes.x = request->x;
+	changes.y = request->y;
+	changes.width = request->width;
+	changes.height = request->height;
+	changes.border_width = request->border_width;
+	changes.sibling = request->above;
+	changes.stack_mode = request->detail;
+
+	XConfigureWindow(display, request->window, request->value_mask, &changes);
+}
+
+void key(XEvent *event)
+{
+	size_t i;
+	KeySym keysym = XkbKeycodeToKeysym(display, event->xkey.keycode, 0, 0);
+
+	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
+		if (keysym == keys[i].keysym && keys[i].modifier == event->xkey.state)
+			keys[i].function(event, keys[i].command);
+}
+
+void map(XEvent *event)
+{
+	XWindowAttributes attributes;
+	Window window = event->xmaprequest.window;
+	XWindowChanges changes = { .border_width = 0 };
 
 	if (!XGetWindowAttributes(display, window, &attributes))
 		return;
@@ -353,135 +153,45 @@ void map_request(XEvent *event)
 	if (attributes.override_redirect)
 		return;
 
-	XSelectInput(display, window, StructureNotifyMask);
+	XSelectInput(display, window, StructureNotifyMask | EnterWindowMask);
+    XConfigureWindow(display, window, CWBorderWidth, &changes);
+	XMoveResizeWindow(display, window, 0, 0, width, height);
 	XMapWindow(display, window);
-
-	current = window;
-
-	if (attributes.height == 0 || attributes.width == 0)
-		reset_window();
-	else if (attributes.x + attributes.y == 0)
-		center_window(0);
-
-	focus_current();
 }
 
-void move_resize_window(char *command)
+void mapping(XEvent *event)
 {
-	char direction;
-	int move, height, width, x, y;
-	XWindowAttributes attributes;
+	XRefreshKeyboardMapping(&event->xmapping);
 
-	if (invalid_current())
-		return;
-
-	if (!XGetWindowAttributes(display, current, &attributes))
-		return;
-
-	/*
-	 * This "direction" and "move" approach is very ugly,
-	 * but it does get the job done.
-	 * */
-	direction = command[1];
-	move = command[0] == 'm';
-
-	height = attributes.height;
-	width = attributes.width;
-
-	x = attributes.x;
-	y = attributes.y;
-
-	switch (direction) {
-		case 'n':
-			height = MAX(WINDOW_MIN_HEIGHT, height - RESIZE_STEP);
-			y = y - MOVE_STEP;
-			break;
-		case 'e':
-			width = width + RESIZE_STEP;
-			x = x + MOVE_STEP;
-			break;
-		case 's':
-			height = height + RESIZE_STEP;
-			y = y + MOVE_STEP;
-			break;
-		case 'w':
-			width = MAX(WINDOW_MIN_WIDTH, width - RESIZE_STEP);
-			x = x - MOVE_STEP;
-			break;
-	}
-
-	if (move)
-		XMoveWindow(display, current, x, y);
-	else
-		XResizeWindow(display, current, width, height);
+	if (event->xmapping.request == MappingKeyboard)
+		grab();
 }
 
-void reset_window()
+void unmap(XEvent *event)
 {
-	if (invalid_current())
-		return;
-
-	XMoveResizeWindow(display, current,
-		screen_width / 4, screen_height / 4,
-		screen_width / 2, screen_height / 2);
+	XUnmapWindow(display, event->xunmap.window);
 }
 
-void snap_window(char *command)
+void next(XEvent *event, char *command)
 {
-	char direction;
-	int half, height, width, x, y;
-	XWindowAttributes attributes;
+	(void)event;
+	(void)command;
 
-	if (invalid_current())
-		return;
-
-	if (!XGetWindowAttributes(display, current, &attributes))
-		return;
-
-	/*
-	 * Ugly approach, same as for move_resize_window,
-	 * but still gets the job done.
-	 * */
-	direction = command[1];
-	half = command[0] == 'h';
-	height = attributes.height;
-	width = attributes.width;
-	x = attributes.x;
-	y = attributes.y;
-
-	switch (direction) {
-		case 'n':
-			height = screen_height / 2;
-			width = half ? screen_width : (screen_width / 2);
-			y = 0;
-			x = 0;
-			break;
-		case 'e':
-			height = half ? screen_height : (screen_height / 2);
-			width = screen_width / 2;
-			y = 0;
-			x = screen_width / 2;
-			break;
-		case 's':
-			height = screen_height / 2;
-			width = half ? screen_width : (screen_width / 2);
-			y = screen_height / 2;
-			x = half ? 0 : (screen_width / 2);
-			break;
-		case 'w':
-			height = half ? screen_height : (screen_height / 2);
-			width = screen_width / 2;
-			y = half ? 0 : (screen_height / 2);
-			x = 0;
-			break;
-	}
-
-	XMoveResizeWindow(display, current, x, y, width, height);
+	XCirculateSubwindowsUp(display, root);
 }
 
-/* Double fork to avoid zombie processes, the way i3WM does it. */
-void spawn_process(char *command)
+void prev(XEvent *event, char *command)
 {
+	(void)event;
+	(void)command;
+
+	XCirculateSubwindowsDown(display, root);
+}
+
+void launch(XEvent *event, char *command)
+{
+	(void)event;
+
 	if (fork() == 0) {
 		if (fork() == 0) {
 			if (display)
@@ -498,26 +208,17 @@ void spawn_process(char *command)
 	}
 }
 
-void unmap_notify(XEvent *event)
+void destroy(XEvent *event, char *command)
 {
-	(void)event;
+	(void)command;
 
-	if (!current || current == root) {
-		current = dummy;
-		focus_current();
-	}
+	XSetCloseDownMode(display, DestroyAll);
+	XKillClient(display, event->xkey.subwindow);
 }
 
-/*
- * We exit the WM by killing the process, leaving it up to
- * Xorg to do all the necessary cleaning up for us.
- *
- * Let's keep things nice and tidy by separating concerns,
- * leaving main deliberately close to empty.
- */
 int main(void)
 {
-	init_wm();
-	grab_input();
-	loop_events();
+	init();
+	grab();
+	loop();
 }
