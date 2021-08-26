@@ -38,7 +38,7 @@ XF86_AudioMute           pamixer -t
 Configuration
 -------------
 
-Modify the source code to change borders, gaps and keybindings to your liking.
+Modify the keybindings to your liking.
 
 
 Dependencies
@@ -50,28 +50,28 @@ You need the Xlib header files.
 Installation
 ------------
 
-If you're about to recompile.
+Clean.
 
     $ make clean
 
-If you only want to compile it.
+Compile.
 
     $ make
 
-If you've already compiled it, and want to install it. [2]
+Install.
 
     $ make install
 
-If you want to do it all in one go. [**]
+All in one go.
 
     $ make clean install
 
-If you want to uninstall it. [**]
+Uninstall.
 
     $ make uninstall
 
-DESTDIR and PREFIX are supported. You may need to run install it as root.
-
+You may need to run install as root.
+DESTDIR and PREFIX are supported.
 
 
 Credits
