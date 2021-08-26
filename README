@@ -8,8 +8,7 @@ of planet Earth itself.
 - There are no workspaces.
 - All windows are maximised.
 - Windows can not be moved or resized.
-- Only one window can be visible at a time.
-- This is similar to jumping between TTYs.
+- Only one window is visible at a time.
 - This certainly isn't for everyone.
 
 
@@ -19,7 +18,7 @@ Keybindings
 MOD4 + Tab               focus next window
 MOD4 + Shift + Tab       focus prev window
 MOD4 + Shift + q         kill window
-MOD4 + Shift + r         refresh wm [1]
+MOD4 + Shift + r         refresh wm [*]
 
 MOD4 + b                 chromium
 MOD4 + Return            xterm
@@ -31,6 +30,9 @@ XF86_MonBrightnessUp     xbacklight -inc 5
 XF86_AudioLowerVolume    pamixer -d 5
 XF86_AudioRaiseVolume    pamixer -i 5
 XF86_AudioMute           pamixer -t
+
+[*] Resizes and repositions windows. Useful when connecting or disconnecting an
+    external monitor, if e.g. screen resolution or dimensions differ.
 
 
 Configuration
@@ -56,7 +58,7 @@ If you only want to compile it.
 
     $ make
 
-If you've already compiled it, and want to install it. [*]
+If you've already compiled it, and want to install it. [2]
 
     $ make install
 
@@ -68,6 +70,9 @@ If you want to uninstall it. [**]
 
     $ make uninstall
 
+DESTDIR and PREFIX are supported. You may need to run install it as root.
+
+
 
 Credits
 -------
@@ -78,13 +83,3 @@ sowm: https://github.com/dylanaraps/sowm
 berry: https://github.com/JLErvin/berry
 tinywm: http://incise.org/tinywm.html
 katriawm: https://www.uninformativ.de/git/katriawm
-
-
-Footnotes
----------
-
-[1] Resizes and repositions windows. Useful when connecting or disconnecting an
-    external monitor, if e.g. screen resolution or dimensions differ.
-[2] DESTDIR and PREFIX are supported.
-[3] You may need to run it as root.
-
