@@ -6,13 +6,6 @@
 #include <X11/XKBlib.h>
 #include <X11/Xlib.h>
 
-#define BORDER_WIDTH 3
-#define BORDER_COLOR 0x24292e
-#define GAP_TOP 30
-#define GAP_RIGHT 30
-#define GAP_BOTTOM 80
-#define GAP_LEFT 30
-
 typedef struct Key Key;
 typedef void (*Events)(XEvent *event);
 
@@ -23,6 +16,11 @@ struct Key {
 	char *command;
 };
 
+static void size(void);
+static void grab(void);
+static void scan(void);
+static void loop(void);
+
 static void enter(XEvent *event);
 static void configure(XEvent *event);
 static void key(XEvent *event);
@@ -31,6 +29,7 @@ static void map(XEvent *event);
 static void focus(XEvent *event, char *command);
 static void launch(XEvent *event, char *command);
 static void destroy(XEvent *event, char *command);
+static void refresh(XEvent *event, char *command);
 
 static int ignore(Display *display, XErrorEvent *event);
 
@@ -44,6 +43,7 @@ static Key keys[] = {
 	{ Mod4Mask, XK_b, launch, "chromium" },
 	{ Mod4Mask, XK_p, launch, "scr" },
 	{ Mod4Mask | ShiftMask, XK_q, destroy, 0 },
+	{ Mod4Mask | ShiftMask, XK_r, refresh, 0 },
 	{ Mod4Mask, XK_Tab, focus, "next" },
 	{ Mod4Mask | ShiftMask, XK_Tab, focus, "prev" },
 	{ 0, XF86XK_AudioMute, launch, "pamixer -t" },
@@ -60,12 +60,50 @@ static const Events events[LASTEvent] = {
 	[MapRequest] = map,
 };
 
-int ignore(Display *display, XErrorEvent *event)
+void size(void)
 {
-	(void)display;
-	(void)event;
+	XWindowAttributes attributes;
 
-	return 0;
+	if (XGetWindowAttributes(display, root, &attributes)) {
+		width = attributes.width;
+		height = attributes.height;
+	} else {
+		width = XDisplayWidth(display, screen);
+		height = XDisplayHeight(display, screen);
+	}
+}
+
+void grab(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
+		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
+			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
+}
+
+void scan()
+{
+	unsigned int i, n;
+	Window r, p, *c;
+
+	if (XQueryTree(display, root, &r, &p, &c, &n)) {
+		for (i = 0; i < n; i++)
+			XMoveResizeWindow(display, c[i], 0, 0, width, height);
+
+		if (c)
+			XFree(c);
+	}
+}
+
+void loop(void)
+{
+	XEvent event;
+
+	while (1 && !XNextEvent(display, &event)) {
+		if (events[event.type])
+			events[event.type](&event);
+	}
 }
 
 void enter(XEvent *event) {
@@ -93,7 +131,7 @@ void configure(XEvent *event)
 
 void key(XEvent *event)
 {
-	size_t i;
+	unsigned int i;
 	KeySym keysym = XkbKeycodeToKeysym(display, event->xkey.keycode, 0, 0);
 
 	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
@@ -104,13 +142,20 @@ void key(XEvent *event)
 void map(XEvent *event)
 {
 	Window window = event->xmaprequest.window;
-	XWindowChanges changes = { .border_width = BORDER_WIDTH };
+	XWindowChanges changes = { .border_width = 0 };
 
 	XSelectInput(display, window, StructureNotifyMask | EnterWindowMask);
-	XSetWindowBorder(display, window, BORDER_COLOR);
 	XConfigureWindow(display, window, CWBorderWidth, &changes);
-	XMoveResizeWindow(display, window, GAP_TOP, GAP_LEFT, width, height);
+	XMoveResizeWindow(display, window, 0, 0, width, height);
 	XMapWindow(display, window);
+}
+
+int ignore(Display *display, XErrorEvent *event)
+{
+	(void)display;
+	(void)event;
+
+	return 0;
 }
 
 void focus(XEvent *event, char *command)
@@ -149,36 +194,31 @@ void destroy(XEvent *event, char *command)
 	XKillClient(display, event->xkey.subwindow);
 }
 
+void refresh(XEvent *event, char *command)
+{
+	(void)event;
+	(void)command;
+
+	size();
+	scan();
+}
+
 int main(void)
 {
-	size_t i;
-	XEvent event;
-
 	if (!(display = XOpenDisplay(0)))
 		exit(1);
 
+	signal(SIGCHLD, SIG_IGN);
 	XSetErrorHandler(ignore);
 
-	signal(SIGCHLD, SIG_IGN);
-
-	root = DefaultRootWindow(display);
-	screen = DefaultScreen(display);
-
-	width = XDisplayWidth(display, screen) - \
-		(GAP_RIGHT + GAP_LEFT + (BORDER_WIDTH * 2));
-
-	height = XDisplayHeight(display, screen) - \
-		(GAP_TOP + GAP_BOTTOM + (BORDER_WIDTH * 2));
+	screen = XDefaultScreen(display);
+	root = XDefaultRootWindow(display);
 
 	XSelectInput(display, root, SubstructureRedirectMask);
 	XDefineCursor(display, root, XCreateFontCursor(display, 68));
 
-	for (i = 0; i < sizeof(keys) / sizeof(struct Key); i++)
-		XGrabKey(display, XKeysymToKeycode(display, keys[i].keysym),
-			keys[i].modifier, root, True, GrabModeAsync, GrabModeAsync);
-
-	while (1 && !XNextEvent(display, &event)) {
-		if (events[event.type])
-			events[event.type](&event);
-	}
+	size();
+	grab();
+	scan();
+	loop();
 }
