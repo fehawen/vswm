@@ -100,13 +100,13 @@ void loop(void)
 {
 	XEvent event;
 
-	while (1 && !XNextEvent(display, &event)) {
+	while (1 && !XNextEvent(display, &event))
 		if (events[event.type])
 			events[event.type](&event);
-	}
 }
 
-void enter(XEvent *event) {
+void enter(XEvent *event)
+{
 	Window window = event->xcrossing.window;
 
 	XSetInputFocus(display, window, RevertToParent, CurrentTime);
@@ -173,7 +173,7 @@ void launch(XEvent *event, char *command)
 	if (fork() == 0) {
 		if (fork() == 0) {
 			if (display)
-				close(ConnectionNumber(display));
+				close(XConnectionNumber(display));
 
 			setsid();
 			execl("/bin/sh", "sh", "-c", command, 0);
