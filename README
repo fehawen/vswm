@@ -31,8 +31,8 @@ XF86_AudioLowerVolume    pamixer -d 5
 XF86_AudioRaiseVolume    pamixer -i 5
 XF86_AudioMute           pamixer -t
 
-[*] Resizes and repositions windows. Useful when connecting or disconnecting an
-    external monitor, if e.g. screen resolution or dimensions differ.
+[*] Resize and reposition windows. Useful when connecting or disconnecting an
+    external monitor, if e.g. screen size differ.
 
 
 Configuration
