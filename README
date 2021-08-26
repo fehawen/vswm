@@ -1,15 +1,16 @@
 vswm - very stupid window manager
 =================================
 
-Probably the most stupid window manager every created, written over an ancient
+Probably the most stupid window manager ever created, written over an ancient
 relic of a library called Xlib -- a library so old that it preceeded the birth
 of planet Earth itself.
 
 - There are no workspaces.
-- All windows are maximized.
+- All windows are maximised.
 - Windows can not be moved or resized.
-- Windows can have outer gaps.
-- Windows can have borders.
+- Only one window can be visible at a time.
+- This is similar to jumping between TTYs.
+- This certainly isn't for everyone.
 
 
 Keybindings
@@ -18,6 +19,7 @@ Keybindings
 MOD4 + Tab               focus next window
 MOD4 + Shift + Tab       focus prev window
 MOD4 + Shift + q         kill window
+MOD4 + Shift + r         refresh wm [1]
 
 MOD4 + b                 chromium
 MOD4 + Return            xterm
@@ -46,9 +48,25 @@ You need the Xlib header files.
 Installation
 ------------
 
-DESTDIR and PREFIX are supported.
+If you're about to recompile.
+
+    $ make clean
+
+If you only want to compile it.
+
+    $ make
+
+If you've already compiled it, and want to install it. [*]
+
+    $ make install
+
+If you want to do it all in one go. [**]
 
     $ make clean install
+
+If you want to uninstall it. [**]
+
+    $ make uninstall
 
 
 Credits
@@ -60,3 +78,13 @@ sowm: https://github.com/dylanaraps/sowm
 berry: https://github.com/JLErvin/berry
 tinywm: http://incise.org/tinywm.html
 katriawm: https://www.uninformativ.de/git/katriawm
+
+
+Footnotes
+---------
+
+[1] Resizes and repositions windows. Useful when connecting or disconnecting an
+    external monitor, if e.g. screen resolution or dimensions differ.
+[2] DESTDIR and PREFIX are supported.
+[3] You may need to run it as root.
+
