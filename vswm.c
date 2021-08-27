@@ -150,14 +150,6 @@ void map(XEvent *event)
 	XMapWindow(display, window);
 }
 
-int ignore(Display *display, XErrorEvent *event)
-{
-	(void)display;
-	(void)event;
-
-	return 0;
-}
-
 void focus(XEvent *event, char *command)
 {
 	(void)event;
@@ -201,6 +193,14 @@ void refresh(XEvent *event, char *command)
 
 	size();
 	scan();
+}
+
+int ignore(Display *display, XErrorEvent *event)
+{
+	(void)display;
+	(void)event;
+
+	return 0;
 }
 
 int main(void)
