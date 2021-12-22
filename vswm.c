@@ -40,7 +40,7 @@ static int screen, width, height;
 static Key keys[] = {
 	{ Mod4Mask, XK_Return, launch, "xterm" },
 	{ Mod4Mask, XK_d, launch, "dmn" },
-	{ Mod4Mask, XK_b, launch, "chromium" },
+	{ Mod4Mask, XK_b, launch, "firefox" },
 	{ Mod4Mask, XK_p, launch, "scr" },
 	{ Mod4Mask | ShiftMask, XK_q, destroy, 0 },
 	{ Mod4Mask | ShiftMask, XK_r, refresh, 0 },
