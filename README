@@ -20,7 +20,7 @@ MOD4 + Shift + Tab       focus prev window
 MOD4 + Shift + q         kill window
 MOD4 + Shift + r         refresh wm [*]
 
-MOD4 + b                 chromium
+MOD4 + b                 firefox
 MOD4 + Return            xterm
 MOD4 + d                 dmn [1]
 MOD4 + p                 scr [2]
