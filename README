@@ -2,7 +2,7 @@ vswm - very stupid window manager
 =================================
 
 Probably the most stupid window manager ever created, written over an ancient
-relic of a library called Xlib -- a library so old that it preceeded the birth
+relic of a library called Xlib -- a library so old that it preceded the birth
 of planet Earth itself.
 
 - There are no workspaces.
